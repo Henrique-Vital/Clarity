@@ -1,0 +1,354 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a73e8">
+  <title>Controle de Visitantes</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a73e8'/%3E%3Ctext x='50' y='68' font-size='45' text-anchor='middle' fill='white' font-family='Arial'%3E%F0%9F%91%A4%3C/text%3E%3C/svg%3E">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="../libs/font-awesome/css/all.min.css">
+
+  <!-- jsPDF -->
+  <script src="../libs/jspdf/jspdf.umd.min.js"></script>
+  <script src="../libs/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- SheetJS -->
+  <script src="../libs/xlsx/xlsx.full.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">
+        <i class="fas fa-user-friends"></i>
+      </div>
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Carregando sistema...</p>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ===== MAIN CONTAINER ===== -->
+  <div class="app-container">
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+      <div class="header-top">
+        <div class="header-left">
+          <div class="logo-area" id="logoArea" title="Clique para enviar a logo oficial">
+            <i class="fas fa-user-friends"></i>
+          </div>
+          <div class="header-title">
+            <h1>Controle de Visitantes</h1>
+            <span class="header-subtitle">Portaria Clarity Glass</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <a href="../index.html" class="btn btn-sm btn-outline" title="Voltar ao Dashboard">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+          <div class="theme-toggle" id="themeToggle" title="Alternar tema">
+            <i class="fas fa-moon"></i>
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="toggleBackupModal()" title="Backup">
+            <i class="fas fa-database"></i>
+          </button>
+        </div>
+      </div>
+      <div class="header-info">
+        <div class="info-item">
+          <i class="fas fa-building"></i>
+          <span><strong>Clarity Glass</strong></span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-calendar-alt"></i>
+          <span id="currentDate">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-clock"></i>
+          <span id="currentTime">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-user-check"></i>
+          <span>Visitas hoje: <strong id="statusIndicator">-</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== FORM SECTION ===== -->
+    <section class="card" id="formSection">
+      <div class="card-header">
+        <h2><i class="fas fa-user-plus"></i> <span id="formTitle">Controlde de entrada e saida de Visitante</span></h2>
+        <div class="card-header-actions">
+          <button class="btn btn-sm btn-outline-danger" onclick="clearForm()" title="Limpar formulário">
+            <i class="fas fa-eraser"></i> Limpar
+          </button>
+        </div>
+      </div>
+
+      <form id="visitanteForm" autocomplete="off">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="vData">Data</label>
+            <input type="date" id="vData">
+          </div>
+          <div class="form-group">
+            <label for="vHoraEntrada">Hora Entrada</label>
+            <input type="time" id="vHoraEntrada">
+          </div>
+          <div class="form-group">
+            <label for="vHoraSaida">Hora Saída</label>
+            <input type="time" id="vHoraSaida" data-auto-time="off">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group vis-nome-group">
+            <label for="vNome">Nome do visitante <span class="required">*</span></label>
+            <div class="vis-search-box">
+              <i class="fas fa-search vis-search-icon"></i>
+              <input type="text" id="vNome" autocomplete="off" placeholder="Digite o nome do visitante..." required
+                     title="Ao digitar, o sistema mostra os visitantes já cadastrados">
+              <button type="button" class="vis-search-clear hidden" id="vBuscaLimpar" onclick="limparBuscaVisitante()" title="Limpar busca" aria-label="Limpar busca">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="vis-results" id="vResultados"></div>
+            <div class="vis-not-found hidden" id="vNaoEncontrado">
+              <i class="fas fa-user-plus"></i>
+              <p>Novo visitante — será cadastrado automaticamente ao salvar.</p>
+            </div>
+            <div id="vAutorizacao"></div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="vEmpresa">Empresa do visitante</label>
+            <input type="text" id="vEmpresa" placeholder="Empresa">
+          </div>
+          <div class="form-group">
+            <label for="vCpfRg">CPF ou RG</label>
+            <input type="text" id="vCpfRg" placeholder="000.000.000-00">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="vPorteiro">Nome do Porteiro</label>
+            <input type="text" id="vPorteiro" placeholder="Nome do porteiro">
+            <p class="form-hint">O nome fica salvo durante o turno — digite outro para trocar.</p>
+          </div>
+          <div class="form-group">
+            <label for="vResponsavel">Nome do responsável da Clarity</label>
+            <input type="text" id="vResponsavel" placeholder="Responsável">
+          </div>
+          <div class="form-group">
+            <label for="vSetor">Setor do responsável</label>
+            <input type="text" id="vSetor" list="setoresList" placeholder="Digite ou selecione o setor">
+            <datalist id="setoresList">
+              <option value="Administrativo">
+              <option value="Produção">
+              <option value="Manutenção">
+              <option value="Qualidade">
+              <option value="Logística">
+              <option value="RH">
+              <option value="Financeiro">
+              <option value="Compras">
+              <option value="TI">
+              <option value="Recepção">
+              <option value="Outro">
+            </datalist>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="vMotivo">Motivo da visita</label>
+            <textarea id="vMotivo" rows="2" placeholder="Motivo da visita"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="vObs">Observações</label>
+            <textarea id="vObs" rows="2" placeholder="Observações adicionais..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="saveBtn">
+            <i class="fas fa-save"></i> Salvar
+          </button>
+          <button type="button" class="btn btn-info" onclick="editSelected()">
+            <i class="fas fa-edit"></i> Editar
+          </button>
+          <button type="button" class="btn btn-danger" onclick="deleteSelected()">
+            <i class="fas fa-trash"></i> Excluir
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===== HISTORY SECTION ===== -->
+    <section class="card" id="historySection">
+      <div class="card-header">
+        <h2><i class="fas fa-history"></i> Histórico de Visitantes</h2>
+        <div class="card-header-actions">
+          <span class="record-count" id="recordCount">0 registro(s)</span>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="history-filters">
+        <div class="filter-group">
+          <i class="fas fa-calendar-alt"></i>
+          <input type="date" id="filterData" title="Filtrar por data">
+        </div>
+        <div class="filter-group">
+          <i class="fas fa-search"></i>
+          <input type="text" id="filterNome" placeholder="Filtrar por nome">
+        </div>
+        <div class="filter-group">
+          <i class="fas fa-building"></i>
+          <input type="text" id="filterEmpresa" placeholder="Filtrar por empresa">
+        </div>
+        <div class="filter-group">
+          <i class="fas fa-user-tie"></i>
+          <input type="text" id="filterResponsavel" placeholder="Filtrar por responsável">
+        </div>
+        <div class="filter-group filter-actions">
+          <button class="btn btn-sm btn-primary" onclick="pesquisar()">
+            <i class="fas fa-search"></i> Pesquisar
+          </button>
+          <button class="btn btn-sm btn-outline-warning" onclick="clearFilters()">
+            <i class="fas fa-times"></i> Limpar
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="goHistory()">
+            <i class="fas fa-list-alt"></i> Histórico
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>H. Entrada</th>
+              <th>H. Saída</th>
+              <th>Visitante</th>
+              <th>Empresa</th>
+              <th>CPF/RG</th>
+              <th>Porteiro</th>
+              <th>Responsável</th>
+              <th>Setor</th>
+              <th>Motivo</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyHistory">
+        <i class="fas fa-user-friends"></i>
+        <p>Nenhum visitante registrado ainda.</p>
+      </div>
+    </section>
+
+    <!-- ===== ACTIONS ===== -->
+    <section class="actions-section">
+      <button class="btn btn-primary" onclick="generateDayReport()">
+        <i class="fas fa-calendar-day"></i> Gerar relatório do dia
+      </button>
+      <button class="btn btn-success" onclick="openPeriodReport()">
+        <i class="fas fa-calendar-alt"></i> Gerar relatório por período
+      </button>
+      <button class="btn btn-info" onclick="exportExcelVisitantes()">
+        <i class="fas fa-file-excel"></i> Exportar Excel
+      </button>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+      <p>Controle de Visitantes &copy; <span id="footerYear">2026</span> &mdash; Todos os direitos reservados.</p>
+      <p class="footer-version">v1.0.0</p>
+    </footer>
+
+  </div>
+
+  <!-- ===== BACKUP MODAL ===== -->
+  <div class="modal-overlay" id="backupModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-database"></i> Backup e Restauração</h2>
+        <button class="modal-close" onclick="toggleBackupModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="backup-actions">
+          <button class="btn btn-primary" onclick="exportBackupVisitantes()">
+            <i class="fas fa-download"></i> Exportar Backup (JSON)
+          </button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importBackupInput').click()">
+            <i class="fas fa-upload"></i> Importar Backup
+          </button>
+          <input type="file" id="importBackupInput" accept=".json" style="display:none" onchange="importBackupVisitantes(event)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VIEW MODAL ===== -->
+  <div class="modal-overlay" id="viewModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2><i class="fas fa-eye"></i> Detalhes do Visitante</h2>
+        <button class="modal-close" onclick="closeViewModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="viewModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="loadSelectedForEdit()"><i class="fas fa-edit"></i> Editar</button>
+        <button class="btn btn-secondary" onclick="closeViewModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRM MODAL ===== -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2><i class="fas fa-question-circle"></i> Confirmar</h2>
+        <button class="modal-close" onclick="UI.closeModal('confirmModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="confirmModalBody">
+        <p>Tem certeza que deseja realizar esta ação?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmBtn">Sim</button>
+        <button class="btn btn-secondary" onclick="UI.closeModal('confirmModal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOGO UPLOAD ===== -->
+  <input type="file" id="logoInput" accept="image/*" style="display:none">
+
+  <!-- JavaScript -->
+  <script src="../js/logo.js"></script>
+  <script src="../js/martseg.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/alarme.js"></script>
+  <script src="../js/portaria.js"></script>
+  <script src="../js/portaria-services-web.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

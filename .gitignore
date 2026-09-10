@@ -1,0 +1,8 @@
+node_modules/
+electron-x64/
+electron-ia32/
+dist/
+out/
+
+# Pacotes de build grandes
+*.zip

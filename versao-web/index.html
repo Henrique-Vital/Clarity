@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a73e8">
+  <title>Portaria - Clarity Glass</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a73e8'/%3E%3Ctext x='50' y='68' font-size='45' text-anchor='middle' fill='white' font-family='Arial'%3ECG%3C/text%3E%3C/svg%3E">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="libs/font-awesome/css/all.min.css">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">
+        <i class="fas fa-building"></i>
+      </div>
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Carregando sistema...</p>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ===== MAIN CONTAINER ===== -->
+  <div class="app-container">
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+      <div class="header-top">
+        <div class="header-left">
+          <div class="logo-area" id="logoArea" title="Clique para enviar a logo oficial">
+            <i class="fas fa-building"></i>
+          </div>
+          <div class="header-title">
+            <h1>Portaria - Clarity Glass</h1>
+            <span class="header-subtitle">Sistema de Controle da Portaria</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="theme-toggle" id="themeToggle" title="Alternar tema">
+            <i class="fas fa-moon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="header-info">
+        <div class="info-item">
+          <i class="fas fa-building"></i>
+          <span><strong>Clarity Glass</strong></span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-calendar-alt"></i>
+          <span id="currentDate">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-clock"></i>
+          <span id="currentTime">-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== HERO ===== -->
+    <section class="portal-hero">
+      <h2><i class="fas fa-shield-alt"></i> Controle da Portaria</h2>
+      <p>Selecione um módulo para iniciar o atendimento.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary hero-cta" id="finalizarTurnoBtn" onclick="finalizarTurno()">
+          <i class="fas fa-flag-checkered"></i> Finalizar Turno
+        </button>
+        <button class="btn btn-outline hero-cta" id="relPeriodoBtn" onclick="gerarRelatorioPeriodo()" title="Gerar relatório por período com todos os módulos do sistema">
+          <i class="fas fa-calendar-alt"></i> Relatório por Período
+        </button>
+        <button class="btn btn-outline hero-cta" id="excelGeralBtn" onclick="exportarExcelGeral()" title="Exportar planilha Excel do período com todos os módulos">
+          <i class="fas fa-file-excel"></i> Exportar Excel Geral
+        </button>
+        <button class="btn btn-success hero-cta" id="backupGeralBtn" onclick="backupGeral()" title="Gerar um único arquivo JSON com todos os dados do sistema">
+          <i class="fas fa-database"></i> Backup Geral
+        </button>
+        <button class="btn btn-secondary hero-cta" id="restaurarBackupBtn" onclick="restaurarBackup()" title="Carregar os dados de um arquivo de backup geral">
+          <i class="fas fa-upload"></i> Restaurar Backup
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== MODULES GRID ===== -->
+    <section class="portal-grid">
+
+      <a class="portal-card card-keys" href="controle-de-chaves/index.html" data-tooltip="Abrir Controle de Chaves ou Item">
+        <div class="portal-icon">
+          <i class="fas fa-key"></i>
+        </div>
+        <h3>Controle de Chaves ou Item</h3>
+        <span class="portal-sub">Retiradas e devoluções</span>
+        <span class="portal-count" id="countChaves">-</span>
+      </a>
+
+      <a class="portal-card card-visit" href="controle-de-visitantes/index.html" data-tooltip="Abrir controle de visitantes">
+        <div class="portal-icon">
+          <i class="fas fa-user-friends"></i>
+        </div>
+        <h3>Controle de Visitantes</h3>
+        <span class="portal-sub">Entradas e saídas</span>
+        <span class="portal-count" id="countVisitantes">-</span>
+      </a>
+
+      <a class="portal-card card-epi" href="controle-de-epis/index.html" data-tooltip="Abrir controle de EPIs">
+        <div class="portal-icon">
+          <i class="fas fa-hard-hat"></i>
+        </div>
+        <h3>Controle de EPIs</h3>
+        <span class="portal-sub">Entrega e devolução</span>
+        <span class="portal-count" id="countEpis">-</span>
+      </a>
+
+      <a class="portal-card card-first-aid" href="controle-de-insumos-primeiros-socorros/index.html" data-tooltip="Abrir controle de primeiros socorros">
+        <div class="portal-icon">
+          <i class="fas fa-kit-medical"></i>
+        </div>
+        <h3>Controle de Primeiros Socorros</h3>
+        <span class="portal-sub">Insumos da caixa</span>
+        <span class="portal-count" id="countFirstAid">-</span>
+      </a>
+
+      <a class="portal-card card-avisos" href="controle-de-avisos/index.html" data-tooltip="Abrir avisos e recados">
+        <div class="portal-icon">
+          <i class="fas fa-bullhorn"></i>
+        </div>
+        <h3>Avisos e Recados</h3>
+        <span class="portal-sub">Comunicados da portaria</span>
+        <span class="portal-count" id="countAvisos">-</span>
+      </a>
+
+      <a class="portal-card card-ocorrencias" href="controle-de-ocorrencias/index.html" data-tooltip="Abrir ocorrências">
+        <div class="portal-icon">
+          <i class="fas fa-clipboard-list"></i>
+        </div>
+        <h3>Ocorrências</h3>
+        <span class="portal-sub">Registro de ocorrências</span>
+        <span class="portal-count" id="countOcorrencias">-</span>
+      </a>
+
+      <a class="portal-card card-cadastros" href="controle-de-cadastros/index.html" data-tooltip="Abrir cadastro de pessoas">
+        <div class="portal-icon">
+          <i class="fas fa-id-card"></i>
+        </div>
+        <h3>Cadastro de Pessoas</h3>
+        <span class="portal-sub">Visitantes, moradores, funcionários e prestadores</span>
+        <span class="portal-count" id="countPessoas">-</span>
+      </a>
+
+      <a class="portal-card card-entrada-saida" href="controle-de-entrada-saida/index.html" data-tooltip="Abrir entrada e saída">
+        <div class="portal-icon">
+          <i class="fas fa-sign-in-alt"></i>
+        </div>
+        <h3>Entrada e Saída</h3>
+        <span class="portal-sub">Movimentações de pessoas</span>
+        <span class="portal-count" id="countMovimentacoes">-</span>
+      </a>
+
+      <a class="portal-card card-autorizacoes" href="controle-de-autorizacoes/index.html" data-tooltip="Abrir autorizações">
+        <div class="portal-icon">
+          <i class="fas fa-file-contract"></i>
+        </div>
+        <h3>Autorizações</h3>
+        <span class="portal-sub">Autorização de acessos</span>
+        <span class="portal-count" id="countAutorizacoes">-</span>
+      </a>
+
+      <a class="portal-card card-config" href="configuracoes/index.html" data-tooltip="Abrir configurações do sistema">
+        <div class="portal-icon">
+          <i class="fas fa-cog"></i>
+        </div>
+        <h3>Configurações</h3>
+        <span class="portal-sub">Tipo de instalação e permissões</span>
+        <span class="portal-count" id="countConfig">-</span>
+      </a>
+
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+      <p>Portaria Clarity Glass &copy; <span id="footerYear">2026</span> &mdash; Todos os direitos reservados.</p>
+      <p class="footer-version">v1.0.0</p>
+    </footer>
+
+  </div>
+
+  <!-- ===== LOGO UPLOAD ===== -->
+  <input type="file" id="logoInput" accept="image/*" style="display:none">
+
+  <!-- ===== BACKUP UPLOAD ===== -->
+  <input type="file" id="backupInput" accept=".json,application/json" style="display:none">
+
+  <!-- ===== CONFIRM MODAL ===== -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2><i class="fas fa-question-circle"></i> Confirmar</h2>
+        <button class="modal-close" onclick="UI.closeModal('confirmModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="confirmModalBody">
+        <p>Tem certeza que deseja realizar esta ação?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmBtn">Sim</button>
+        <button class="btn btn-secondary" onclick="UI.closeModal('confirmModal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOADING "FINALIZAR TURNO" / RELATÓRIOS ===== -->
+  <div id="turnoLoading" class="turno-loading">
+    <div class="turno-loading-card">
+      <div class="loading-spinner"></div>
+      <p>Processando, aguarde...</p>
+    </div>
+  </div>
+
+  <!-- ===== MODAL DE PRÉ-VISUALIZAÇÃO DO RELATÓRIO ===== -->
+  <div class="modal-overlay" id="turnoPreviewModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-envelope-open-text"></i> Relatório e E-mail Preparados</h2>
+        <button class="modal-close" data-close="turnoPreviewModal" title="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-row">
+          <span class="detail-label">Destinatários</span>
+          <span class="detail-value" id="turnoTo">-</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">CC</span>
+          <span class="detail-value" id="turnoCc">-</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Assunto</span>
+          <span class="detail-value" id="turnoSubject">-</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Nome do PDF</span>
+          <span class="detail-value" id="turnoPdfName">-</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Tamanho do PDF</span>
+          <span class="detail-value" id="turnoPdfSize">-</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Data</span>
+          <span class="detail-value" id="turnoDate">-</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Hora</span>
+          <span class="detail-value" id="turnoTime">-</span>
+        </div>
+        <div class="turno-message-block">
+          <span class="detail-label">Mensagem</span>
+          <div class="turno-message" id="turnoBody">-</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="turnoNewBtn" title="Descartar e começar de novo">
+          <i class="fas fa-plus"></i> Preparar novo relatório
+        </button>
+        <button class="btn btn-secondary" id="turnoCopyBtn" title="Copiar a mensagem para a área de transferência">
+          <i class="fas fa-copy"></i> Copiar mensagem
+        </button>
+        <button class="btn btn-success" id="turnoOutlookBtn" title="Abrir o Outlook com a mensagem e o PDF anexado prontos para enviar">
+          <i class="fas fa-envelope"></i> Abrir no Outlook
+        </button>
+        <button class="btn btn-primary" id="turnoDownloadBtn" title="Baixar o PDF gerado">
+          <i class="fas fa-download"></i> Baixar PDF
+        </button>
+        <button class="btn btn-secondary" data-close="turnoPreviewModal">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="js/logo.js"></script>
+  <script src="js/martseg.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/alarme.js"></script>
+  <script src="js/portaria-services-web.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+/* ===================================================================
+   CONTROLE DE OCORRÊNCIAS - STYLE.CSS
+   ===================================================================
+   Estilos específicos do módulo de Ocorrências.
+   Complementa o base.css mantendo a mesma identidade visual.
+   =================================================================== */
+
+/* ===== FORM ACTIONS ===== */
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .form-actions {
+    flex-direction: column;
+  }
+  .form-actions .btn {
+    justify-content: center;
+  }
+}

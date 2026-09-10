@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a73e8">
+  <title>Entrada e Saída</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a73e8'/%3E%3Ctext x='50' y='68' font-size='45' text-anchor='middle' fill='white' font-family='Arial'%3E%E2%86%BA%3C/text%3E%3C/svg%3E">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="../libs/font-awesome/css/all.min.css">
+
+  <!-- jsPDF -->
+  <script src="../libs/jspdf/jspdf.umd.min.js"></script>
+  <script src="../libs/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- SheetJS -->
+  <script src="../libs/xlsx/xlsx.full.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">
+        <i class="fas fa-sign-in-alt"></i>
+      </div>
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Carregando sistema...</p>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ===== MAIN CONTAINER ===== -->
+  <div class="app-container">
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+      <div class="header-top">
+        <div class="header-left">
+          <div class="logo-area" id="logoArea" title="Clique para enviar a logo oficial">
+            <i class="fas fa-sign-in-alt"></i>
+          </div>
+          <div class="header-title">
+            <h1>Entrada e Saída</h1>
+            <span class="header-subtitle">Portaria Clarity Glass</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <a href="../index.html" class="btn btn-sm btn-outline" title="Voltar ao Dashboard">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+          <div class="theme-toggle" id="themeToggle" title="Alternar tema">
+            <i class="fas fa-moon"></i>
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="toggleBackupModal()" title="Backup">
+            <i class="fas fa-database"></i>
+          </button>
+        </div>
+      </div>
+      <div class="header-info">
+        <div class="info-item">
+          <i class="fas fa-building"></i>
+          <span><strong>Clarity Glass</strong></span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-calendar-alt"></i>
+          <span id="currentDate">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-clock"></i>
+          <span id="currentTime">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-exchange-alt"></i>
+          <span>Movimentações hoje: <strong id="statusIndicator">-</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== ATENDIMENTO ===== -->
+    <section class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-shield-alt"></i> Atendimento</h2>
+        <div class="card-header-actions">
+          <div class="filter-group porteiro-group">
+            <i class="fas fa-user-tie"></i>
+            <input type="text" id="esPorteiro" placeholder="Nome do porteiro" title="Nome do porteiro responsável"> 
+          </div>
+        </div>
+      </div>
+
+      <div class="es-search-box">
+        <i class="fas fa-search es-search-icon"></i>
+        <input type="text" id="esBusca" autocomplete="off" placeholder="Pesquisar pessoa por NOME ou CPF/RG..."
+               title="Ao digitar, o sistema pesquisa automaticamente nos cadastros">
+        <button type="button" class="es-search-clear hidden" id="esBuscaLimpar" onclick="limparBusca()"
+                title="Limpar pesquisa" aria-label="Limpar pesquisa">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Resultados da pesquisa -->
+      <div class="es-results" id="esResultados"></div>
+
+      <!-- Pessoa não cadastrada -->
+      <div class="es-not-found hidden" id="esNaoEncontrado">
+        <i class="fas fa-user-plus"></i>
+        <p>Pessoa não cadastrada. Deseja registrar uma nova pessoa?</p>
+        <button class="btn btn-primary" onclick="abrirNovaPessoa()">
+          <i class="fas fa-user-plus"></i> Cadastrar e Registrar Entrada
+        </button>
+      </div>
+
+      <!-- Card da pessoa encontrada -->
+      <div class="es-pessoa hidden" id="esPessoaCard">
+        <div class="es-pessoa-head">
+          <div>
+            <input type="text" id="esPessoaNomeInput" class="es-editable-name" placeholder="Nome da pessoa" title="Nome (editável)">
+            <div class="es-pessoa-tags">
+              <select id="esPessoaTipoInput" class="es-editable-tipo" title="Tipo (editável)">
+                <option value="visitante">Visitante</option>
+                <option value="morador">Morador</option>
+                <option value="funcionario">Funcionário</option>
+                <option value="prestador">Prestador de serviço</option>
+              </select>
+            </div>
+            <p class="es-pessoa-vinculo" id="esPessoaVinculo">-</p>
+          </div>
+          <div class="es-pessoa-status">
+            <div id="esPessoaStatus"></div>
+            <div id="esPessoaAuthBadge"></div>
+          </div>
+        </div>
+
+        <div class="es-pessoa-dados">
+          <div class="detail-row"><span class="detail-label">Documento</span><span class="detail-value"><input type="text" id="esPessoaDocInput" class="es-editable" placeholder="CPF/RG (opcional)"></span></div>
+          <div class="detail-row"><span class="detail-label">Empresa</span><span class="detail-value"><input type="text" id="esPessoaEmpresaInput" class="es-editable" placeholder="Empresa"></span></div>
+          <div class="detail-row"><span class="detail-label">Telefone</span><span class="detail-value"><input type="text" id="esPessoaTelefoneInput" class="es-editable" placeholder="(00) 00000-0000"></span></div>
+          <div class="detail-row"><span class="detail-label">E-mail</span><span class="detail-value"><input type="email" id="esPessoaEmailInput" class="es-editable" placeholder="email@exemplo.com"></span></div>
+          <div class="detail-row"><span class="detail-label">Responsável / autorizador</span><span class="detail-value"><input type="text" id="esPessoaRespInput" class="es-editable" placeholder="Nome do responsável (opcional)" title="Opcional — registrado na movimentação"></span></div>
+          <div class="detail-row es-row-full"><span class="detail-label">Observações</span><span class="detail-value"><textarea id="esPessoaObsInput" class="es-editable" rows="2" placeholder="Observações..."></textarea></span></div>
+        </div>
+        <p class="es-edit-hint"><i class="fas fa-pen"></i> Os dados editados aqui são salvos automaticamente ao registrar entrada ou saída.</p>
+
+        <div class="es-autorizacoes" id="esPessoaAutorizacoes"></div>
+
+        <div class="es-pessoa-actions">
+          <button class="btn btn-success es-btn-big" id="esBtnEntrada" onclick="registrarEntradaDireta()">
+            <i class="fas fa-sign-in-alt"></i> Registrar Entrada
+          </button>
+          <button class="btn btn-danger es-btn-big" id="esBtnSaida" onclick="abrirModalSaida()">
+            <i class="fas fa-sign-out-alt"></i> Registrar Saída
+          </button>
+        </div>
+
+        <div class="es-ultimos" id="esUltimos"></div>
+      </div>
+    </section>
+
+    <!-- ===== MOVIMENTAÇÕES ===== -->
+    <section class="card" id="historySection">
+      <div class="card-header">
+        <h2><i class="fas fa-history"></i> Movimentações</h2>
+        <div class="card-header-actions">
+          <span class="record-count" id="recordCount">0 registro(s)</span>
+        </div>
+      </div>
+
+      <div class="history-filters">
+        <div class="filter-group">
+          <i class="fas fa-calendar-alt"></i>
+          <input type="date" id="filterData" title="Filtrar por data">
+        </div>
+        <div class="filter-group">
+          <i class="fas fa-search"></i>
+          <input type="text" id="filterBusca" placeholder="Buscar por nome ou documento">
+        </div>
+        <div class="filter-group">
+          <i class="fas fa-user-tag"></i>
+          <select id="filterTipo">
+            <option value="">Todos os tipos</option>
+            <option value="visitante">Visitantes</option>
+            <option value="morador">Moradores</option>
+            <option value="funcionario">Funcionários</option>
+            <option value="prestador">Prestadores</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <i class="fas fa-user-check"></i>
+          <select id="filterStatus">
+            <option value="">Todos os status</option>
+            <option value="dentro">Dentro</option>
+            <option value="fora">Fora</option>
+          </select>
+        </div>
+        <div class="filter-group filter-actions">
+          <button class="btn btn-sm btn-primary" onclick="pesquisar()">
+            <i class="fas fa-search"></i> Pesquisar
+          </button>
+          <button class="btn btn-sm btn-outline-warning" onclick="clearFilters()">
+            <i class="fas fa-times"></i> Limpar
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Entrada</th>
+              <th>Saída</th>
+              <th>Pessoa</th>
+              <th>Tipo</th>
+              <th>Documento</th>
+              <th>Porteiro</th>
+              <th>Responsável</th>
+              <th>Situação</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyHistory">
+        <i class="fas fa-sign-in-alt"></i>
+        <p>Nenhuma movimentação registrada.</p>
+      </div>
+      <div class="pagination" id="historyPagination">
+        <button class="btn btn-sm btn-outline" onclick="changePage(-1)" id="historyPrevBtn" title="Voltar página">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="pagination-info" id="historyPageInfo">-</span>
+        <button class="btn btn-sm btn-outline" onclick="changePage(1)" id="historyNextBtn" title="Próximos registros">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== ACTIONS ===== -->
+    <section class="actions-section">
+      <button class="btn btn-primary" onclick="generateDayReport()">
+        <i class="fas fa-calendar-day"></i> Gerar relatório do dia
+      </button>
+      <button class="btn btn-success" onclick="openPeriodReport()">
+        <i class="fas fa-calendar-alt"></i> Gerar relatório por período
+      </button>
+      <button class="btn btn-info" onclick="exportExcelMovimentacoes()">
+        <i class="fas fa-file-excel"></i> Exportar Excel
+      </button>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+      <p>Entrada e Saída &copy; <span id="footerYear">2026</span> &mdash; Todos os direitos reservados.</p>
+      <p class="footer-version">v1.0.0</p>
+    </footer>
+
+  </div>
+
+  <!-- ===== BACKUP MODAL ===== -->
+  <div class="modal-overlay" id="backupModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-database"></i> Backup e Restauração</h2>
+        <button class="modal-close" onclick="toggleBackupModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:14px;">
+          O backup das movimentações inclui também os cadastros de pessoas,
+          para que o vínculo e o histórico sejam preservados na restauração.
+        </p>
+        <div class="backup-actions">
+          <button class="btn btn-primary" onclick="exportBackupMovimentacoes()">
+            <i class="fas fa-download"></i> Exportar Backup (JSON)
+          </button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importBackupInput').click()">
+            <i class="fas fa-upload"></i> Importar Backup
+          </button>
+          <input type="file" id="importBackupInput" accept=".json" style="display:none" onchange="importBackupMovimentacoes(event)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== NOVA PESSOA MODAL ===== -->
+  <div class="modal-overlay" id="novaPessoaModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-user-plus"></i> Cadastrar e Registrar Entrada</h2>
+        <button class="modal-close" data-close="novaPessoaModal" title="Fechar">&times;</button>
+      </div>
+      <form id="novaPessoaForm" autocomplete="off">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="npNome">Nome completo <span class="required">*</span></label>
+            <input type="text" id="npNome" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="npTipo">Tipo <span class="required">*</span></label>
+              <select id="npTipo">
+                <option value="visitante">Visitante</option>
+                <option value="morador">Morador</option>
+                <option value="funcionario">Funcionário</option>
+                <option value="prestador">Prestador de serviço</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="npDocumento">CPF ou RG <em>(opcional)</em></label>
+              <input type="text" id="npDocumento" placeholder="000.000.000-00">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" id="npGroupEmpresa">
+              <label for="npEmpresa">Empresa <em>(opcional)</em></label>
+              <input type="text" id="npEmpresa" placeholder="Empresa da pessoa">
+            </div>
+            <div class="form-group" id="npGroupUnidade">
+              <label for="npUnidade">Unidade <em>(opcional)</em></label>
+              <input type="text" id="npUnidade" placeholder="Ex.: Apartamento 12">
+            </div>
+            <div class="form-group" id="npGroupSetor">
+              <label for="npSetor">Setor <em>(opcional)</em></label>
+              <input type="text" id="npSetor" placeholder="Ex.: Produção">
+            </div>
+            <div class="form-group" id="npGroupTipoServico">
+              <label for="npTipoServico">Tipo de serviço <em>(opcional)</em></label>
+              <input type="text" id="npTipoServico" placeholder="Ex.: Manutenção">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="npTelefone">Telefone <em>(opcional)</em></label>
+              <input type="text" id="npTelefone" placeholder="(00) 00000-0000">
+            </div>
+            <div class="form-group">
+              <label for="npEmail">E-mail <em>(opcional)</em></label>
+              <input type="email" id="npEmail" placeholder="email@exemplo.com">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="npResponsavel">Responsável / autorizador <em>(opcional)</em></label>
+            <input type="text" id="npResponsavel" placeholder="Quem autorizou a entrada">
+          </div>
+          <div class="form-group">
+            <label for="npObs">Observações <em>(opcional)</em></label>
+            <textarea id="npObs" rows="2" placeholder="Observações adicionais..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> Cadastrar e Registrar Entrada
+          </button>
+          <button type="button" class="btn btn-secondary" data-close="novaPessoaModal">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== ENTRADA MODAL ===== -->
+  <div class="modal-overlay" id="entradaModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 id="entradaModalTitle"><i class="fas fa-sign-in-alt"></i> Registrar Entrada</h2>
+        <button class="modal-close" data-close="entradaModal" title="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-person-line" id="entradaPessoaInfo">-</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="entData">Data <span class="required">*</span></label>
+            <input type="date" id="entData" required>
+          </div>
+          <div class="form-group">
+            <label for="entHora">Hora <span class="required">*</span></label>
+            <input type="time" id="entHora" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="entPorteiro">Porteiro <span class="required">*</span></label>
+          <input type="text" id="entPorteiro" required>
+        </div>
+        <div class="form-group" id="entRespGroup">
+          <label for="entResponsavel">Responsável / autorizador <em>(opcional)</em></label>
+          <input type="text" id="entResponsavel" placeholder="Quem autorizou a entrada">
+        </div>
+        <div class="form-group">
+          <label for="entObs">Observações <em>(opcional)</em></label>
+          <textarea id="entObs" rows="2" placeholder="Observações..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" id="entradaModalBtn" onclick="confirmarEntrada()">
+          <i class="fas fa-check"></i> Confirmar Entrada
+        </button>
+        <button class="btn btn-secondary" data-close="entradaModal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SAÍDA MODAL ===== -->
+  <div class="modal-overlay" id="saidaModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2><i class="fas fa-sign-out-alt"></i> Registrar Saída</h2>
+        <button class="modal-close" data-close="saidaModal" title="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-person-line" id="saidaPessoaInfo">-</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="saiData">Data <span class="required">*</span></label>
+            <input type="date" id="saiData" required>
+          </div>
+          <div class="form-group">
+            <label for="saiHora">Hora <span class="required">*</span></label>
+            <input type="time" id="saiHora" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="saiPorteiro">Porteiro <span class="required">*</span></label>
+          <input type="text" id="saiPorteiro" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" onclick="confirmarSaida()">
+          <i class="fas fa-check"></i> Confirmar Saída
+        </button>
+        <button class="btn btn-secondary" data-close="saidaModal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VIEW MOVIMENTAÇÃO MODAL ===== -->
+  <div class="modal-overlay" id="viewMovModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-eye"></i> Detalhes da Movimentação</h2>
+        <button class="modal-close" onclick="closeViewModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="viewMovBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeViewModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRM MODAL ===== -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2><i class="fas fa-question-circle"></i> Confirmar</h2>
+        <button class="modal-close" onclick="UI.closeModal('confirmModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="confirmModalBody">
+        <p>Tem certeza que deseja realizar esta ação?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmBtn">Sim</button>
+        <button class="btn btn-secondary" onclick="UI.closeModal('confirmModal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOGO UPLOAD ===== -->
+  <input type="file" id="logoInput" accept="image/*" style="display:none">
+
+  <!-- JavaScript -->
+  <script src="../js/logo.js"></script>
+  <script src="../js/martseg.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/alarme.js"></script>
+  <script src="../js/portaria.js"></script>
+  <script src="../js/portaria-services-web.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

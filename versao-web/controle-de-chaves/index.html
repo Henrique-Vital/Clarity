@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a73e8">
+  <title>Controle de Chaves ou Item</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a73e8'/%3E%3Ctext x='50' y='68' font-size='45' text-anchor='middle' fill='white' font-family='Arial'%3E%F0%9F%94%91%3C/text%3E%3C/svg%3E">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="../libs/font-awesome/css/all.min.css">
+
+  <!-- jsPDF -->
+  <script src="../libs/jspdf/jspdf.umd.min.js"></script>
+  <script src="../libs/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- SheetJS -->
+  <script src="../libs/xlsx/xlsx.full.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">
+        <i class="fas fa-key"></i>
+      </div>
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Carregando sistema...</p>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ===== MAIN CONTAINER ===== -->
+  <div class="app-container">
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+      <div class="header-top">
+        <div class="header-left">
+          <div class="logo-area" id="logoArea" title="Clique para enviar a logo oficial">
+            <i class="fas fa-key"></i>
+          </div>
+          <div class="header-title">
+            <h1>Controle de Chaves ou Item</h1>
+            <span class="header-subtitle">Portaria Clarity Glass</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <a href="../index.html" class="btn btn-sm btn-outline" title="Voltar ao Dashboard">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+          <div class="theme-toggle" id="themeToggle" title="Alternar tema">
+            <i class="fas fa-moon"></i>
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="toggleBackupModal()" title="Backup">
+            <i class="fas fa-database"></i>
+          </button>
+        </div>
+      </div>
+      <div class="header-info">
+        <div class="info-item">
+          <i class="fas fa-building"></i>
+          <span><strong>Clarity Glass</strong></span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-calendar-alt"></i>
+          <span id="currentDate">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-clock"></i>
+          <span id="currentTime">-</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-key"></i>
+          <span>Em uso: <strong id="statusIndicator">-</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== TABS ===== -->
+    <div class="tabs" id="moduleTabs">
+      <button class="tab-btn active" data-tab="comum">
+        <i class="fas fa-key"></i> Chaves Comuns
+      </button>
+      <button class="tab-btn" data-tab="almoxarifado">
+        <i class="fas fa-box-open"></i> Almoxarifado
+      </button>
+      <button class="tab-btn" data-tab="veiculo">
+        <i class="fas fa-truck"></i> Veículos
+      </button>
+    </div>
+
+    <!-- ===== PANEL: CHAVES COMUNS ===== -->
+    <section class="tab-panel active" id="tab-comum">
+      <div class="form-grid">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-sign-out-alt"></i> Retirada de Chave ou item</h2>
+          </div>
+          <form id="retiradaComumForm" autocomplete="off">
+            <div class="form-group">
+              <label for="retiradaComumChave">Nome da chave <span class="required">*</span></label>
+              <input type="text" id="retiradaComumChave" list="chavesComunsList" placeholder="Ex.: Sala Financeiro, RH, Laboratório..." required>
+              <datalist id="chavesComunsList"></datalist>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="retiradaComumFuncionario">Nome do funcionário <span class="required">*</span></label>
+                <input type="text" id="retiradaComumFuncionario" placeholder="Nome do funcionário" required>
+              </div>
+              <div class="form-group">
+                <label for="retiradaComumData">Data <span class="required">*</span></label>
+                <input type="date" id="retiradaComumData" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="retiradaComumHora">Hora <span class="required">*</span></label>
+                <input type="time" id="retiradaComumHora" required>
+              </div>
+              <div class="form-group">
+                <label for="retiradaComumObs">Observação (opcional)</label>
+                <input type="text" id="retiradaComumObs" placeholder="Observações...">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-sign-out-alt"></i> Retirar
+            </button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-sign-in-alt"></i> Devolução de Chave</h2>
+          </div>
+          <form id="devolucaoComumForm" autocomplete="off">
+            <div class="form-group">
+              <label for="devolucaoComumSelect">Chave a devolver <span class="required">*</span></label>
+              <select id="devolucaoComumSelect" required>
+                <option value="">-- Selecione uma chave em uso --</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="devolucaoComumFuncionario">Nome do funcionário que devolveu <span class="required">*</span></label>
+                <input type="text" id="devolucaoComumFuncionario" placeholder="Nome do funcionário" required>
+              </div>
+              <div class="form-group">
+                <label for="devolucaoComumData">Data <span class="required">*</span></label>
+                <input type="date" id="devolucaoComumData" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="devolucaoComumHora">Hora <span class="required">*</span></label>
+                <input type="time" id="devolucaoComumHora" required>
+              </div>
+              <div class="form-group">
+                <label for="devolucaoComumObs">Observação</label>
+                <input type="text" id="devolucaoComumObs" placeholder="Observações...">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-sign-in-alt"></i> Devolver
+            </button>
+          </form>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card-header">
+          <h2><i class="fas fa-history"></i> Histórico - Chaves Comuns</h2>
+          <div class="card-header-actions">
+            <span class="record-count" id="recordCountComum">0 registro(s)</span>
+          </div>
+        </div>
+        <div class="history-filters">
+          <div class="filter-group">
+            <i class="fas fa-calendar-alt"></i>
+            <input type="date" id="filtroComumDia" title="Filtrar por dia">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-calendar-day"></i>
+            <input type="date" id="filtroComumInicio" title="Período inicial">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-calendar-check"></i>
+            <input type="date" id="filtroComumFim" title="Período final">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-key"></i>
+            <input type="text" id="filtroComumChave" placeholder="Nome da chave ou item...">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-user"></i>
+            <input type="text" id="filtroComumFunc" placeholder="Nome do funcionário...">
+          </div>
+          <div class="filter-group filter-actions">
+            <button class="btn btn-sm btn-primary" onclick="pesquisar('comum')">
+              <i class="fas fa-search"></i> Pesquisar
+            </button>
+            <button class="btn btn-sm btn-outline-warning" onclick="clearFilters('comum')">
+              <i class="fas fa-times"></i> Limpar
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Chave</th>
+                <th>Funcionário</th>
+                <th>Operação</th>
+                <th>Status</th>
+                <th>Observação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="historyBodyComum"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="emptyComum">
+          <i class="fas fa-key"></i>
+          <p>Nenhuma movimentação de chaves comuns registrada.</p>
+        </div>
+        <div class="pagination" id="pagComum">
+          <button class="btn btn-sm btn-outline" onclick="changePage('comum',-1)" id="pagComumPrev" title="Voltar página">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span class="pagination-info" id="pagComumInfo">-</span>
+          <button class="btn btn-sm btn-outline" onclick="changePage('comum',1)" id="pagComumNext" title="Próximos registros">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== PANEL: ALMOXARIFADO ===== -->
+    <section class="tab-panel" id="tab-almoxarifado">
+      <div class="form-grid">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-sign-out-alt"></i> Retirada de Chave do Almoxarifado</h2>
+          </div>
+          <form id="retiradaAlmoxForm" autocomplete="off">
+            <div class="form-group">
+              <label for="retiradaAlmoxChave">Chave</label>
+              <input type="text" id="retiradaAlmoxChave" value="Chaves do Almoxarifado" readonly>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="retiradaAlmoxFuncionario">Nome do funcionário <span class="required">*</span></label>
+                <input type="text" id="retiradaAlmoxFuncionario" placeholder="Nome do funcionário" required>
+              </div>
+              <div class="form-group">
+                <label for="retiradaAlmoxData">Data <span class="required">*</span></label>
+                <input type="date" id="retiradaAlmoxData" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="retiradaAlmoxHora">Hora <span class="required">*</span></label>
+                <input type="time" id="retiradaAlmoxHora" required>
+              </div>
+              <div class="form-group">
+                <label for="retiradaAlmoxObs">Observação (opcional)</label>
+                <input type="text" id="retiradaAlmoxObs" placeholder="Observações...">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-sign-out-alt"></i> Retirar
+            </button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-sign-in-alt"></i> Devolução de Chave do Almoxarifado</h2>
+          </div>
+          <form id="devolucaoAlmoxForm" autocomplete="off">
+            <div class="form-group">
+              <label for="devolucaoAlmoxSelect">Chave a devolver <span class="required">*</span></label>
+              <select id="devolucaoAlmoxSelect" required>
+                <option value="">-- Selecione uma chave em uso --</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="devolucaoAlmoxFuncionario">Nome do funcionário que devolveu <span class="required">*</span></label>
+                <input type="text" id="devolucaoAlmoxFuncionario" placeholder="Nome do funcionário" required>
+              </div>
+              <div class="form-group">
+                <label for="devolucaoAlmoxData">Data <span class="required">*</span></label>
+                <input type="date" id="devolucaoAlmoxData" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="devolucaoAlmoxHora">Hora <span class="required">*</span></label>
+                <input type="time" id="devolucaoAlmoxHora" required>
+              </div>
+              <div class="form-group">
+                <label for="devolucaoAlmoxObs">Observação</label>
+                <input type="text" id="devolucaoAlmoxObs" placeholder="Observações...">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-sign-in-alt"></i> Devolver
+            </button>
+          </form>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card-header">
+          <h2><i class="fas fa-history"></i> Histórico - Almoxarifado</h2>
+          <div class="card-header-actions">
+            <span class="record-count" id="recordCountAlmox">0 registro(s)</span>
+          </div>
+        </div>
+        <div class="history-filters">
+          <div class="filter-group">
+            <i class="fas fa-calendar-alt"></i>
+            <input type="date" id="filtroAlmoxDia" title="Filtrar por dia">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-calendar-day"></i>
+            <input type="date" id="filtroAlmoxInicio" title="Período inicial">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-calendar-check"></i>
+            <input type="date" id="filtroAlmoxFim" title="Período final">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-box-open"></i>
+            <input type="text" id="filtroAlmoxChave" placeholder="Nome da chave ou item...">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-user"></i>
+            <input type="text" id="filtroAlmoxFunc" placeholder="Nome do funcionário...">
+          </div>
+          <div class="filter-group filter-actions">
+            <button class="btn btn-sm btn-primary" onclick="pesquisar('almoxarifado')">
+              <i class="fas fa-search"></i> Pesquisar
+            </button>
+            <button class="btn btn-sm btn-outline-warning" onclick="clearFilters('almoxarifado')">
+              <i class="fas fa-times"></i> Limpar
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Chave</th>
+                <th>Funcionário</th>
+                <th>Operação</th>
+                <th>Status</th>
+                <th>Observação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="historyBodyAlmox"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="emptyAlmox">
+          <i class="fas fa-box-open"></i>
+          <p>Nenhuma movimentação de chaves do almoxarifado registrada.</p>
+        </div>
+        <div class="pagination" id="pagAlmox">
+          <button class="btn btn-sm btn-outline" onclick="changePage('almoxarifado',-1)" id="pagAlmoxPrev" title="Voltar página">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span class="pagination-info" id="pagAlmoxInfo">-</span>
+          <button class="btn btn-sm btn-outline" onclick="changePage('almoxarifado',1)" id="pagAlmoxNext" title="Próximos registros">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== PANEL: VEÍCULOS ===== -->
+    <section class="tab-panel" id="tab-veiculo">
+      <section class="card">
+        <div class="card-header">
+          <h2><i class="fas fa-truck"></i> Status dos Veículos</h2>
+        </div>
+        <div class="vehicle-grid" id="vehicleGrid"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2><i class="fas fa-truck"></i> Registrar Movimentação de Veículo</h2>
+        </div>
+        <form id="veiculoForm" autocomplete="off">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="veiculoSelect">Veículo <span class="required">*</span></label>
+              <select id="veiculoSelect" required></select>
+            </div>
+            <div class="form-group">
+              <label for="veiculoOperacao">Operação <span class="required">*</span></label>
+              <select id="veiculoOperacao" required>
+                <option value="retirada">Retirada</option>
+                <option value="devolucao">Devolução</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="veiculoFuncionario">Nome do funcionário <span class="required">*</span></label>
+              <input type="text" id="veiculoFuncionario" placeholder="Nome do funcionário" required>
+            </div>
+            <div class="form-group">
+              <label for="veiculoData">Data <span class="required">*</span></label>
+              <input type="date" id="veiculoData" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="veiculoHora">Hora <span class="required">*</span></label>
+              <input type="time" id="veiculoHora" required>
+            </div>
+            <div class="form-group">
+              <label for="veiculoObs">Observação (opcional)</label>
+              <input type="text" id="veiculoObs" placeholder="Observações...">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="veiculoSubmitBtn">
+            <i class="fas fa-check"></i> Registrar
+          </button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2><i class="fas fa-history"></i> Histórico - Veículos</h2>
+          <div class="card-header-actions">
+            <span class="record-count" id="recordCountVeiculo">0 registro(s)</span>
+          </div>
+        </div>
+        <div class="history-filters">
+          <div class="filter-group">
+            <i class="fas fa-calendar-alt"></i>
+            <input type="date" id="filtroVeiculoDia" title="Filtrar por dia">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-calendar-day"></i>
+            <input type="date" id="filtroVeiculoInicio" title="Período inicial">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-calendar-check"></i>
+            <input type="date" id="filtroVeiculoFim" title="Período final">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-truck"></i>
+            <input type="text" id="filtroVeiculoChave" placeholder="Nome do veículo ou placa...">
+          </div>
+          <div class="filter-group">
+            <i class="fas fa-user"></i>
+            <input type="text" id="filtroVeiculoFunc" placeholder="Nome do funcionário...">
+          </div>
+          <div class="filter-group filter-actions">
+            <button class="btn btn-sm btn-primary" onclick="pesquisar('veiculo')">
+              <i class="fas fa-search"></i> Pesquisar
+            </button>
+            <button class="btn btn-sm btn-outline-warning" onclick="clearFilters('veiculo')">
+              <i class="fas fa-times"></i> Limpar
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Veículo</th>
+                <th>Funcionário</th>
+                <th>Retirada</th>
+                <th>Devolução</th>
+                <th>Tempo fora</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="historyBodyVeiculo"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="emptyVeiculo">
+          <i class="fas fa-truck"></i>
+          <p>Nenhuma movimentação de veículos registrada.</p>
+        </div>
+        <div class="pagination" id="pagVeiculo">
+          <button class="btn btn-sm btn-outline" onclick="changePage('veiculo',-1)" id="pagVeiculoPrev" title="Voltar página">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span class="pagination-info" id="pagVeiculoInfo">-</span>
+          <button class="btn btn-sm btn-outline" onclick="changePage('veiculo',1)" id="pagVeiculoNext" title="Próximos registros">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== ACTIONS ===== -->
+    <section class="actions-section">
+      <button class="btn btn-primary" onclick="generateDayReport()">
+        <i class="fas fa-calendar-day"></i> Gerar relatório do dia
+      </button>
+      <button class="btn btn-success" onclick="openPeriodReport()">
+        <i class="fas fa-calendar-alt"></i> Gerar relatório por período
+      </button>
+      <button class="btn btn-info" onclick="exportExcelChaves()">
+        <i class="fas fa-file-excel"></i> Exportar Excel
+      </button>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+      <p>Controle de Chaves ou Item &copy; <span id="footerYear">2026</span> &mdash; Todos os direitos reservados.</p>
+      <p class="footer-version">v1.0.0</p>
+    </footer>
+
+  </div>
+
+  <!-- ===== BACKUP MODAL ===== -->
+  <div class="modal-overlay" id="backupModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-database"></i> Backup e Restauração</h2>
+        <button class="modal-close" onclick="toggleBackupModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="backup-actions">
+          <button class="btn btn-primary" onclick="exportBackupChaves()">
+            <i class="fas fa-download"></i> Exportar Backup (JSON)
+          </button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importBackupInput').click()">
+            <i class="fas fa-upload"></i> Importar Backup
+          </button>
+          <input type="file" id="importBackupInput" accept=".json" style="display:none" onchange="importBackupChaves(event)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VIEW MODAL ===== -->
+  <div class="modal-overlay" id="viewModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2><i class="fas fa-eye"></i> Detalhes da Movimentação</h2>
+        <button class="modal-close" onclick="closeViewModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="viewModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeViewModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRM MODAL ===== -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2><i class="fas fa-question-circle"></i> Confirmar</h2>
+        <button class="modal-close" onclick="UI.closeModal('confirmModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="confirmModalBody">
+        <p>Tem certeza que deseja realizar esta ação?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmBtn">Sim</button>
+        <button class="btn btn-secondary" onclick="UI.closeModal('confirmModal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOGO UPLOAD ===== -->
+  <input type="file" id="logoInput" accept="image/*" style="display:none">
+
+  <!-- JavaScript -->
+  <script src="../js/logo.js"></script>
+  <script src="../js/martseg.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/alarme.js"></script>
+  <script src="../js/portaria-services-web.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
