@@ -198,6 +198,19 @@ const UI = (() => {
   /* ===== RELATÓRIO POR PERÍODO (MODAL COMPARTILHADO) ===== */
   const REPORT_MODAL_ID = 'reportModal';
 
+  // Seções que podem ser incluídas no relatório (chave = campo em modulesData).
+  const REPORT_SECTIONS = [
+    ['chaves', 'Chaves ou Item'],
+    ['epis', 'EPIs'],
+    ['insumos', 'Insumos'],
+    ['primeirosSocorros', 'Primeiros Socorros'],
+    ['visitantes', 'Visitantes'],
+    ['avisos', 'Avisos e Recados'],
+    ['ocorrencias', 'Ocorrências'],
+    ['entradasSaidas', 'Entrada e Saída'],
+    ['autorizacoes', 'Autorizações']
+  ];
+
   const reportModalHtml = `
     <div class="modal-overlay" id="reportModal">
       <div class="modal modal-sm">
@@ -214,6 +227,35 @@ const UI = (() => {
             <label for="reportEnd">Data final <span class="required">*</span></label>
             <input type="date" id="reportEnd">
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reportPorteiro">Porteiro (opcional)</label>
+              <input type="text" id="reportPorteiro" placeholder="Filtrar por porteiro">
+            </div>
+            <div class="form-group">
+              <label for="reportTipo">Tipo de pessoa (opcional)</label>
+              <select id="reportTipo">
+                <option value="">Todos</option>
+                <option value="visitante">Visitante</option>
+                <option value="morador">Morador</option>
+                <option value="funcionario">Funcionário</option>
+                <option value="prestador">Prestador</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Seções do relatório</label>
+            <div class="report-sections" id="reportSections">
+              ${REPORT_SECTIONS.map(([key, label]) => `
+                <label class="report-section-item">
+                  <input type="checkbox" data-section="${key}" checked>
+                  <span>${label}</span>
+                </label>`).join('')}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" id="reportToggleAll" style="margin-top:10px;">
+              <i class="fas fa-check-double"></i> Marcar/desmarcar todas
+            </button>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-primary" id="reportGenerateBtn">
@@ -226,6 +268,14 @@ const UI = (() => {
   `;
 
   let reportCallback = null;
+
+  function readReportSections() {
+    const sections = {};
+    document.querySelectorAll('#reportSections input[data-section]').forEach((cb) => {
+      sections[cb.getAttribute('data-section')] = cb.checked;
+    });
+    return sections;
+  }
 
   function injectReportModal() {
     if (!$('#' + REPORT_MODAL_ID)) {
@@ -242,21 +292,41 @@ const UI = (() => {
           showToast('A data inicial deve ser anterior ou igual à data final.', 'error');
           return;
         }
+        const sections = readReportSections();
+        if (!Object.keys(sections).some((k) => sections[k])) {
+          showToast('Selecione ao menos uma seção do relatório.', 'error');
+          return;
+        }
+        const filters = {
+          porteiro: ($('#reportPorteiro') ? $('#reportPorteiro').value : '').trim(),
+          tipo: $('#reportTipo') ? $('#reportTipo').value : ''
+        };
         closeModal(REPORT_MODAL_ID);
-        if (reportCallback) reportCallback(start, end);
+        if (reportCallback) reportCallback(start, end, sections, filters);
       });
+      const toggle = $('#reportToggleAll');
+      if (toggle) {
+        toggle.addEventListener('click', () => {
+          const boxes = Array.from(document.querySelectorAll('#reportSections input[data-section]'));
+          const allChecked = boxes.every((b) => b.checked);
+          boxes.forEach((b) => { b.checked = !allChecked; });
+        });
+      }
     }
   }
 
   /**
    * Abre o modal de relatório por período.
-   * @param {Function} callback - Recebe (dataInicio, dataFim).
+   * @param {Function} callback - Recebe (dataInicio, dataFim, seções).
    */
   function openReportModal(callback) {
     injectReportModal();
     reportCallback = callback;
     $('#reportStart').value = todayISO();
     $('#reportEnd').value = todayISO();
+    if ($('#reportPorteiro')) $('#reportPorteiro').value = '';
+    if ($('#reportTipo')) $('#reportTipo').value = '';
+    document.querySelectorAll('#reportSections input[data-section]').forEach((b) => { b.checked = true; });
     openModal(REPORT_MODAL_ID);
   }
 
@@ -327,11 +397,11 @@ const UI = (() => {
       doc.setLineWidth(0.6);
       doc.line(14, y + 8, pageWidth - 14, y + 8);
 
-      // ===== TABELA =====
-      doc.autoTable({
-        startY: y + 12,
-        head: [options.columns],
-        body: options.rows,
+      // ===== TABELA (ou seções) =====
+      const tableOpts = (startY, columns, rows) => ({
+        startY,
+        head: [columns],
+        body: rows,
         theme: 'grid',
         headStyles: {
           fillColor: [26, 115, 232],
@@ -349,6 +419,33 @@ const UI = (() => {
         },
         margin: { left: 14, right: 14 }
       });
+
+      if (Array.isArray(options.sections) && options.sections.length) {
+        let sy = y + 12;
+        options.sections.forEach((sec) => {
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(26, 115, 232);
+          doc.text(sec.heading || '', 14, sy);
+          doc.setFont(undefined, 'normal');
+          doc.setTextColor(33, 33, 33);
+
+          if (Array.isArray(sec.text) && sec.text.length) {
+            let ty = sy + 6;
+            doc.setFontSize(9);
+            sec.text.forEach((line) => {
+              doc.text(String(line), 14, ty);
+              ty += 5;
+            });
+            sy = ty + 6;
+          } else {
+            doc.autoTable(tableOpts(sy + 3, sec.columns, sec.rows));
+            sy = (doc.lastAutoTable ? doc.lastAutoTable.finalY : sy) + 12;
+          }
+        });
+      } else {
+        doc.autoTable(tableOpts(y + 12, options.columns, options.rows));
+      }
 
       // ===== RODAPÉ =====
       const pageHeight = doc.internal.pageSize.getHeight();

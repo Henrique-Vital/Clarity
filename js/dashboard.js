@@ -22,6 +22,8 @@ async function finalizarTurno() {
     renderPreviewModal(turnoResult);
     setTurnoLoading(false);
     UI.showToast('Relatório preparado com sucesso.', 'success');
+    // Backup geral automático junto do fechamento do turno (silencioso).
+    backupGeralSilencioso();
   } catch (e) {
     console.error('Erro ao preparar relatório:', e);
     setTurnoLoading(false);
@@ -53,49 +55,14 @@ function renderPreviewModal(result) {
 
 // ===== BACKUP GERAL =====
 async function backupGeral() {
-  const FileService = window.PortariaServices ? window.PortariaServices.FileService : null;
-  if (!FileService || typeof FileService.savePdf !== 'function') {
-    UI.showToast('Serviços de arquivo não carregados. Abra o sistema pelo aplicativo da Portaria ou pela versão web.', 'error');
+  if (!window.PortariaBackup) {
+    UI.showToast('Módulo de backup não carregado.', 'error');
     return;
   }
   UI.showToast('Gerando backup geral...', 'info');
   try {
-    let firstAid = null;
-    try {
-      const saved = localStorage.getItem('firstAidSystem');
-      firstAid = saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      // ignora erros de leitura do módulo existente
-    }
-
-    const backup = {
-      sistema: 'Portaria - Clarity Glass',
-      versao: '1.0.0',
-      geradoEm: new Date().toISOString(),
-      dados: {
-        chaves: await DB.exportStore('chaves'),
-        visitantes: await DB.exportStore('visitantes'),
-        visitantes_perfil: await DB.exportStore('visitantes_perfil'),
-        epis: await DB.exportStore('epis'),
-        avisos: await DB.exportStore('avisos'),
-        ocorrencias: await DB.exportStore('ocorrencias'),
-        pessoas: await DB.exportStore('pessoas'),
-        entradas_saidas: await DB.exportStore('entradas_saidas'),
-        autorizacoes: await DB.exportStore('autorizacoes'),
-        config: await DB.exportStore('config'),
-        insumos: firstAid && Array.isArray(firstAid.inventory) ? firstAid.inventory : [],
-        primeirosSocorros: firstAid
-      },
-      preferencias: {
-        tema: localStorage.getItem('clarityTheme') || 'light',
-        logo: localStorage.getItem('clarityLogo') || null
-      }
-    };
-
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const fileName = 'backup_geral_' + UI.todayISO() + '.json';
-    const res = await FileService.savePdf(blob, fileName);
-    const pasta = (res && res.folderName) ? res.folderName : 'controle-da-portaria';
+    const res = await window.PortariaBackup.save();
+    const pasta = (res && res.res && res.res.folderName) ? res.res.folderName : 'controle-da-portaria';
     UI.showToast('Backup geral salvo com sucesso na pasta "' + pasta + '".', 'success');
   } catch (e) {
     console.error('Erro ao gerar backup geral:', e);
@@ -103,60 +70,123 @@ async function backupGeral() {
   }
 }
 
-// ===== RESTAURAR BACKUP =====
-async function restaurarBackup() {
+/** Gera o backup geral em silêncio (sem toasts), usado no Finalizar Turno. */
+async function backupGeralSilencioso() {
+  if (!window.PortariaBackup) return;
+  try {
+    await window.PortariaBackup.save();
+  } catch (e) {
+    console.warn('Falha no backup automático do turno:', e);
+  }
+}
+
+// ===== RESTAURAR BACKUP (SELETIVO) =====
+const RESTORE_LABELS = {
+  chaves: 'Controle de Chaves ou Item',
+  visitantes: 'Controle de Visitantes',
+  visitantes_perfil: 'Perfis de Visitantes',
+  epis: 'Controle de EPIs',
+  avisos: 'Avisos e Recados',
+  ocorrencias: 'Ocorrências',
+  pessoas: 'Cadastro de Pessoas',
+  entradas_saidas: 'Entrada e Saída',
+  autorizacoes: 'Autorizações',
+  config: 'Configurações'
+};
+let pendingBackup = null;
+
+function restaurarBackup() {
   const input = document.getElementById('backupInput');
   if (!input) return;
   input.value = '';
-  input.addEventListener('change', async (e) => {
+  input.onchange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     try {
       const text = await file.text();
       const backup = JSON.parse(text);
-
       if (!backup || backup.sistema !== 'Portaria - Clarity Glass' || !backup.dados) {
         UI.showToast('Arquivo inválido. Selecione um arquivo de backup geral (.json).', 'error');
         return;
       }
-
-      const nomesStores = ['chaves', 'visitantes', 'visitantes_perfil', 'epis', 'avisos', 'ocorrencias', 'pessoas', 'entradas_saidas', 'autorizacoes', 'config'];
-      const presentes = nomesStores.filter((s) => Array.isArray(backup.dados[s]));
-      const total = presentes.reduce((acc, s) => acc + backup.dados[s].length, 0);
-      const temInsumos = backup.dados && backup.dados.primeirosSocorros;
-
-      UI.showConfirm(
-        `Restaurar backup de ${backup.geradoEm ? new Date(backup.geradoEm).toLocaleString('pt-BR') : 'data desconhecida'}?` +
-        ` Este arquivo contém ${total} registro(s) em ${presentes.length} módulo(s)` +
-        `${temInsumos ? ' e os dados de Primeiros Socorros' : ''}.` +
-        ` Todos os dados atuais serão SUBSTITUÍDOS. Deseja continuar?`,
-        async () => {
-          try {
-            UI.showToast('Restaurando backup...', 'info');
-            for (const s of presentes) {
-              await DB.importStore(s, backup.dados[s]);
-            }
-            if (temInsumos) {
-              localStorage.setItem('firstAidSystem', JSON.stringify(backup.dados.primeirosSocorros));
-            }
-            if (backup.preferencias) {
-              if (backup.preferencias.tema) localStorage.setItem('clarityTheme', backup.preferencias.tema);
-              if (backup.preferencias.logo) localStorage.setItem('clarityLogo', backup.preferencias.logo);
-            }
-            UI.showToast('Backup restaurado com sucesso. Recarregando...', 'success');
-            setTimeout(() => location.reload(), 1200);
-          } catch (err) {
-            console.error('Erro ao restaurar backup:', err);
-            UI.showToast('Erro ao restaurar o backup.', 'error');
-          }
-        }
-      );
+      pendingBackup = backup;
+      abrirModalRestauracao(backup);
     } catch (err) {
       console.error('Erro ao ler o arquivo de backup:', err);
       UI.showToast('Arquivo inválido ou corrompido.', 'error');
     }
-  });
+  };
   input.click();
+}
+
+function abrirModalRestauracao(backup) {
+  const lista = document.getElementById('restoreList');
+  const resumo = document.getElementById('restoreSummary');
+  if (!lista) return;
+
+  const itens = [];
+  Object.keys(RESTORE_LABELS).forEach((s) => {
+    if (Array.isArray(backup.dados[s])) {
+      itens.push({ kind: 'store', name: s, label: RESTORE_LABELS[s], count: backup.dados[s].length });
+    }
+  });
+  if (backup.dados.primeirosSocorros) {
+    const ps = backup.dados.primeirosSocorros;
+    const n = Array.isArray(ps.occurrences) ? ps.occurrences.length : 0;
+    itens.push({ kind: 'firstAid', name: 'primeiros_socorros', label: 'Primeiros Socorros (ocorrências e insumos)', count: n });
+  }
+  if (backup.preferencias) {
+    itens.push({ kind: 'prefs', name: 'preferencias', label: 'Preferências (tema e logo)', count: 1 });
+  }
+
+  const total = itens.reduce((acc, i) => acc + i.count, 0);
+  const dataTxt = backup.geradoEm ? new Date(backup.geradoEm).toLocaleString('pt-BR') : 'data desconhecida';
+  resumo.textContent = `Backup de ${dataTxt} — ${total} registro(s) em ${itens.length} módulo(s).`;
+
+  lista.innerHTML = itens.map((i) => `
+    <label class="restore-item">
+      <input type="checkbox" data-kind="${i.kind}" data-name="${i.name}" checked>
+      <span class="restore-name">${UI.escHtml(i.label)}</span>
+      <span class="restore-count">${i.count} registro(s)</span>
+    </label>
+  `).join('');
+
+  UI.openModal('restoreModal');
+}
+
+async function confirmarRestauracao() {
+  if (!pendingBackup) return;
+  const boxes = Array.from(document.querySelectorAll('#restoreList input[type=checkbox]:checked'));
+  if (!boxes.length) {
+    UI.showToast('Selecione ao menos um módulo para restaurar.', 'warning');
+    return;
+  }
+  UI.closeModal('restoreModal');
+  UI.showToast('Restaurando backup...', 'info');
+  try {
+    for (const box of boxes) {
+      const kind = box.getAttribute('data-kind');
+      const name = box.getAttribute('data-name');
+      if (kind === 'store') {
+        await DB.importStore(name, pendingBackup.dados[name]);
+      } else if (kind === 'firstAid') {
+        const st = pendingBackup.dados.primeirosSocorros;
+        localStorage.setItem('firstAidSystem', JSON.stringify(st));
+        if (st && typeof DB !== 'undefined' && DB.store) {
+          await DB.store('primeiros_socorros').put(Object.assign({ id: 'state' }, st));
+        }
+      } else if (kind === 'prefs') {
+        const p = pendingBackup.preferencias || {};
+        if (p.tema) localStorage.setItem('clarityTheme', p.tema);
+        if (p.logo) localStorage.setItem('clarityLogo', p.logo);
+      }
+    }
+    UI.showToast('Backup restaurado com sucesso. Recarregando...', 'success');
+    setTimeout(() => location.reload(), 1200);
+  } catch (err) {
+    console.error('Erro ao restaurar backup:', err);
+    UI.showToast('Erro ao restaurar o backup.', 'error');
+  }
 }
 
 // ===== AÇÕES DO MODAL =====
@@ -222,6 +252,70 @@ function prepararNovoRelatorio() {
   UI.closeModal(DASHBOARD_MODAL_ID);
 }
 
+// ===== ENVIAR POR E-MAIL (SMTP) =====
+async function enviarEmail() {
+  if (!turnoResult) return;
+  if (!window.portariaAPI || !window.portariaAPI.isElectron || !window.portariaAPI.sendEmail) {
+    UI.showToast('O envio direto por e-mail está disponível apenas no aplicativo da Portaria.', 'warning');
+    return;
+  }
+  let smtp = {};
+  try {
+    smtp = JSON.parse(localStorage.getItem('claritySmtpConfig') || '{}') || {};
+  } catch (e) {
+    smtp = {};
+  }
+  if (!smtp.host) {
+    UI.showToast('Configure o servidor de e-mail (SMTP) no módulo Configurações.', 'warning');
+    return;
+  }
+  const { to, cc, subject, body } = turnoResult.draft;
+  UI.showToast('Enviando e-mail...', 'info');
+  try {
+    const res = await window.portariaAPI.sendEmail({
+      smtp,
+      to,
+      cc,
+      subject,
+      body,
+      fileName: turnoResult.pdf.pdfName,
+      base64: turnoResult.pdf.pdfBase64
+    });
+    if (res && res.ok) {
+      UI.showToast('E-mail enviado com sucesso!', 'success');
+    } else {
+      UI.showToast('Erro ao enviar o e-mail: ' + ((res && res.error) || 'erro desconhecido'), 'error');
+    }
+  } catch (err) {
+    UI.showToast('Erro ao enviar o e-mail: ' + (err && err.message ? err.message : 'erro inesperado'), 'error');
+  }
+}
+
+// ===== TELA CHEIA / MODO QUIOSQUE =====
+async function toggleTelaCheia() {
+  // Electron: usa a API nativa da janela (tela cheia).
+  if (window.portariaAPI && window.portariaAPI.isElectron && window.portariaAPI.toggleFullscreen) {
+    try {
+      const res = await window.portariaAPI.toggleFullscreen();
+      UI.showToast(res && res.fullscreen ? 'Tela cheia ativada.' : 'Tela cheia desativada.', 'info');
+      return;
+    } catch (e) {
+      // cai para a Fullscreen API do navegador
+    }
+  }
+  // Navegador: Fullscreen API.
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      UI.showToast('Tela cheia ativada. Pressione Esc para sair.', 'info');
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (e) {
+    UI.showToast('Não foi possível alternar a tela cheia.', 'warning');
+  }
+}
+
 // ===== RELATÓRIO POR PERÍODO (TODOS OS MÓDULOS) =====
 async function gerarRelatorioPeriodo() {
   const services = window.PortariaServices;
@@ -229,10 +323,10 @@ async function gerarRelatorioPeriodo() {
     UI.showToast('Serviços de relatório não carregados. Abra o sistema pelo aplicativo da Portaria.', 'error');
     return;
   }
-  UI.openReportModal(async (start, end) => {
+  UI.openReportModal(async (start, end, sections, filters) => {
     setTurnoLoading(true);
     try {
-      const res = await services.ReportService.preparePeriodReport(start, end);
+      const res = await services.ReportService.preparePeriodReport(start, end, sections, filters);
       setTurnoLoading(false);
       await salvarArquivoGeral(res.pdf.pdfBlob, res.pdf.pdfName, 'Relatório do período');
     } catch (e) {
@@ -250,10 +344,10 @@ async function exportarExcelGeral() {
     UI.showToast('Serviços de relatório não carregados. Abra o sistema pelo aplicativo da Portaria.', 'error');
     return;
   }
-  UI.openReportModal(async (start, end) => {
+  UI.openReportModal(async (start, end, sections, filters) => {
     UI.showToast('Gerando planilha do período...', 'info');
     try {
-      const res = await services.ReportService.preparePeriodExcel(start, end);
+      const res = await services.ReportService.preparePeriodExcel(start, end, filters);
       await salvarArquivoGeral(res.excelBlob, res.excelName, 'Planilha do período');
     } catch (e) {
       console.error('Erro ao exportar Excel:', e);
@@ -306,6 +400,133 @@ async function abrirOutlook() {
   }
 }
 
+// ===== PRIMEIROS SOCORROS (IndexedDB com fallback no localStorage) =====
+async function lerPrimeirosSocorros() {
+  try {
+    if (typeof DB !== 'undefined' && DB.store) {
+      const rec = await DB.store('primeiros_socorros').get('state');
+      if (rec) return rec;
+    }
+  } catch (e) {
+    // segue para o fallback
+  }
+  try {
+    const saved = localStorage.getItem('firstAidSystem');
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ===== BUSCA GLOBAL =====
+let globalSearchTimer = null;
+
+function normBusca(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function debounceBuscaGlobal() {
+  clearTimeout(globalSearchTimer);
+  globalSearchTimer = setTimeout(executarBuscaGlobal, 250);
+}
+
+async function executarBuscaGlobal() {
+  const input = document.getElementById('globalSearch');
+  const box = document.getElementById('globalResults');
+  const clearBtn = document.getElementById('globalSearchClear');
+  if (!input || !box) return;
+  const q = normBusca(input.value).trim();
+  if (clearBtn) clearBtn.classList.toggle('hidden', !input.value);
+  if (!q) { box.classList.remove('open'); box.innerHTML = ''; return; }
+
+  let data;
+  try {
+    const [pessoas, visitantes, chaves, epis, ocorrencias, avisos, movs] = await Promise.all([
+      DB.store('pessoas').getAll(),
+      DB.store('visitantes').getAll(),
+      DB.store('chaves').getAll(),
+      DB.store('epis').getAll(),
+      DB.store('ocorrencias').getAll(),
+      DB.store('avisos').getAll(),
+      DB.store('entradas_saidas').getAll()
+    ]);
+    data = { pessoas, visitantes, chaves, epis, ocorrencias, avisos, movs };
+  } catch (e) {
+    console.error('Erro na busca global:', e);
+    return;
+  }
+
+  const results = [];
+  const push = (modulo, link, label, detail) => results.push({ modulo, link, label, detail });
+  const LIMIT = 5;
+
+  (data.pessoas || []).filter((p) => normBusca([p.nome, p.documento, p.empresa, p.setor, p.telefone, p.email].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((p) => push('Cadastro de Pessoas', 'controle-de-cadastros/index.html', p.nome, [p.tipo, p.empresa || p.setor, p.documento].filter(Boolean).join(' · ')));
+
+  (data.visitantes || []).filter((v) => normBusca([v.nome, v.empresa, v.cpfRg, v.responsavel].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((v) => push('Controle de Visitantes', 'controle-de-visitantes/index.html', v.nome, [v.empresa, v.data].filter(Boolean).join(' · ')));
+
+  (data.chaves || []).filter((c) => normBusca([c.chave, c.funcionario, c.veiculo, c.placa, c.retornoFuncionario].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((c) => push('Controle de Chaves ou Item', 'controle-de-chaves/index.html', c.chave || c.veiculo || '-', [c.funcionario, c.status].filter(Boolean).join(' · ')));
+
+  (data.epis || []).filter((e) => normBusca([e.visitante, e.porteiro, e.responsavel].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((e) => push('Controle de EPIs', 'controle-de-epis/index.html', e.visitante || '-', [e.porteiro, e.status].filter(Boolean).join(' · ')));
+
+  (data.ocorrencias || []).filter((o) => normBusca([o.porteiro, o.descricao].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((o) => push('Ocorrências', 'controle-de-ocorrencias/index.html', (o.descricao || '-').slice(0, 60), o.porteiro || ''));
+
+  (data.avisos || []).filter((a) => normBusca([a.porteiro, a.nome, a.texto].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((a) => push('Avisos e Recados', 'controle-de-avisos/index.html', (a.texto || '-').slice(0, 60), a.nome || a.porteiro || ''));
+
+  (data.movs || []).filter((m) => normBusca([m.nome, m.documento, m.porteiro, m.responsavel].join(' ')).includes(q)).slice(0, LIMIT)
+    .forEach((m) => push('Entrada e Saída', 'controle-de-entrada-saida/index.html', m.nome || '-', [m.data, m.horaEntrada].filter(Boolean).join(' ')));
+
+  renderGlobalResults(results);
+}
+
+/** Posiciona o dropdown de resultados logo abaixo do campo de busca. */
+function posicionarResultadosGlobais() {
+  const input = document.getElementById('globalSearch');
+  const box = document.getElementById('globalResults');
+  if (!input || !box) return;
+  const r = input.getBoundingClientRect();
+  box.style.left = r.left + 'px';
+  box.style.top = (r.bottom + 4) + 'px';
+  box.style.width = r.width + 'px';
+}
+
+function renderGlobalResults(results) {
+  const box = document.getElementById('globalResults');
+  if (!box) return;
+  posicionarResultadosGlobais();
+  if (!results.length) {
+    box.innerHTML = '<div class="global-empty">Nenhum resultado encontrado.</div>';
+    box.classList.add('open');
+    return;
+  }
+  const groups = {};
+  results.forEach((r) => { (groups[r.modulo] = groups[r.modulo] || []).push(r); });
+  box.innerHTML = Object.keys(groups).map((mod) => `
+    <div class="global-group">
+      <div class="global-group-title">${UI.escHtml(mod)}</div>
+      ${groups[mod].map((r) => `
+        <a class="global-item" href="${r.link}">
+          <span class="global-item-label">${UI.escHtml(r.label)}</span>
+          ${r.detail ? `<span class="global-item-detail">${UI.escHtml(r.detail)}</span>` : ''}
+        </a>`).join('')}
+    </div>`).join('');
+  box.classList.add('open');
+}
+
+function limparBuscaGlobal() {
+  const input = document.getElementById('globalSearch');
+  const box = document.getElementById('globalResults');
+  const clearBtn = document.getElementById('globalSearchClear');
+  if (input) { input.value = ''; input.focus(); }
+  if (box) { box.classList.remove('open'); box.innerHTML = ''; }
+  if (clearBtn) clearBtn.classList.add('hidden');
+}
+
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
   UI.initCommon();
@@ -313,9 +534,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const $ = (sel) => document.querySelector(sel);
   const today = UI.todayISO();
 
+  const gsInput = document.getElementById('globalSearch');
+  if (gsInput) gsInput.addEventListener('input', debounceBuscaGlobal);
+  document.addEventListener('click', (e) => {
+    const wrap = document.querySelector('.header-search');
+    const box = document.getElementById('globalResults');
+    if (box && wrap && !wrap.contains(e.target)) box.classList.remove('open');
+  });
+  const reposicionarBusca = () => {
+    const box = document.getElementById('globalResults');
+    if (box && box.classList.contains('open')) posicionarResultadosGlobais();
+  };
+  window.addEventListener('resize', reposicionarBusca);
+  window.addEventListener('scroll', reposicionarBusca, true);
+
   document.getElementById('turnoCopyBtn').addEventListener('click', copiarMensagem);
   document.getElementById('turnoDownloadBtn').addEventListener('click', baixarPdf);
   document.getElementById('turnoOutlookBtn').addEventListener('click', abrirOutlook);
+  const turnoEmailBtn = document.getElementById('turnoEmailBtn');
+  if (turnoEmailBtn) turnoEmailBtn.addEventListener('click', enviarEmail);
   document.getElementById('turnoNewBtn').addEventListener('click', prepararNovoRelatorio);
 
   try {
@@ -355,17 +592,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       : 'Nenhuma ocorrência hoje';
 
     // ===== CONTROLE DE PRIMEIROS SOCORROS =====
-    // O módulo de primeiros socorros utiliza LocalStorage (módulo existente).
-    let firstAidCount = 0;
-    try {
-      const saved = localStorage.getItem('firstAidSystem');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        firstAidCount = (parsed.occurrences || []).filter((o) => o.data === today).length;
-      }
-    } catch (e) {
-      // ignora erros de leitura do módulo existente
-    }
+    const firstAid = await lerPrimeirosSocorros();
+    const firstAidCount = firstAid
+      ? (firstAid.occurrences || []).filter((o) => o.data === today).length
+      : 0;
     $('#countFirstAid').textContent = firstAidCount > 0
       ? `${firstAidCount} ocorrência(s) hoje`
       : 'Nenhuma ocorrência hoje';
@@ -394,11 +624,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== CONFIGURAÇÕES =====
     $('#countConfig').textContent = 'Ajustes do sistema';
 
+    // ===== ALERTAS / INDICADORES =====
+    const chavesEmUso = chaves.filter((r) => r.status === 'em_uso').length;
+
+    // Pessoas no local agora: considera a última movimentação de cada pessoa.
+    const porPessoa = new Map();
+    movimentacoes.forEach((r) => {
+      const key = r.pessoaId || ('nome:' + (r.nome || ''));
+      const stamp = String(r.data || '') + ' ' + String(r.horaEntrada || '');
+      const prev = porPessoa.get(key);
+      if (!prev || stamp >= prev.stamp) porPessoa.set(key, { stamp, r });
+    });
+    const pessoasDentro = Array.from(porPessoa.values())
+      .filter((x) => x.r.status !== 'fora' && !x.r.horaSaida).length;
+
+    // Insumos críticos (sem estoque / crítico / atenção).
+    const insumosCriticos = firstAid
+      ? (firstAid.inventory || []).filter((i) => Number(i.remaining) <= 3).length
+      : 0;
+
+    $('#alertChaves').textContent = chavesEmUso;
+    $('#alertEpis').textContent = episPendentes;
+    $('#alertDentro').textContent = pessoasDentro;
+    $('#alertInsumos').textContent = insumosCriticos;
+    const stockEl = document.querySelector('.alert-item.alert-stock');
+    if (stockEl) stockEl.classList.toggle('zero', insumosCriticos === 0);
+
     UI.showToast('Sistema carregado. Selecione um módulo para começar.', 'success');
   } catch (e) {
     console.error('Erro ao carregar resumo do dashboard:', e);
     ['countChaves', 'countVisitantes', 'countEpis', 'countFirstAid', 'countAvisos', 'countOcorrencias',
-     'countPessoas', 'countMovimentacoes', 'countAutorizacoes', 'countConfig'].forEach((id) => {
+     'countPessoas', 'countMovimentacoes', 'countAutorizacoes', 'countConfig',
+     'alertChaves', 'alertEpis', 'alertDentro', 'alertInsumos'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.textContent = 'Pronto para uso';
     });

@@ -67,6 +67,12 @@
           <span id="currentTime">-</span>
         </div>
       </div>
+      <div class="header-search">
+        <i class="fas fa-search"></i>
+        <input type="text" id="globalSearch" aria-label="Buscar em todo o sistema" placeholder="Buscar em todo o sistema (pessoas, visitantes, chaves, EPIs, ocorrências, avisos...)" autocomplete="off">
+        <button type="button" id="globalSearchClear" class="global-search-clear hidden" onclick="limparBuscaGlobal()" title="Limpar">&times;</button>
+        <div class="global-results" id="globalResults"></div>
+      </div>
     </header>
 
     <!-- ===== HERO ===== -->
@@ -89,6 +95,41 @@
         <button class="btn btn-secondary hero-cta" id="restaurarBackupBtn" onclick="restaurarBackup()" title="Carregar os dados de um arquivo de backup geral">
           <i class="fas fa-upload"></i> Restaurar Backup
         </button>
+        <button class="btn btn-outline hero-cta" id="fullscreenBtn" onclick="toggleTelaCheia()" title="Alternar tela cheia (modo quiosque no aplicativo)">
+          <i class="fas fa-expand"></i> Tela cheia
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== ALERTAS / INDICADORES ===== -->
+    <section class="alert-bar" id="alertBar">
+      <div class="alert-item alert-keys" title="Chaves ou itens em uso agora">
+        <i class="fas fa-key"></i>
+        <div class="alert-info">
+          <strong id="alertChaves">-</strong>
+          <span>chaves em uso</span>
+        </div>
+      </div>
+      <div class="alert-item alert-epis" title="Entregas de EPI pendentes de devolução">
+        <i class="fas fa-hard-hat"></i>
+        <div class="alert-info">
+          <strong id="alertEpis">-</strong>
+          <span>EPIs pendentes</span>
+        </div>
+      </div>
+      <div class="alert-item alert-people" title="Pessoas no local agora">
+        <i class="fas fa-users"></i>
+        <div class="alert-info">
+          <strong id="alertDentro">-</strong>
+          <span>pessoas no local</span>
+        </div>
+      </div>
+      <div class="alert-item alert-stock" title="Insumos com estoque crítico (sem estoque, crítico ou atenção)">
+        <i class="fas fa-briefcase-medical"></i>
+        <div class="alert-info">
+          <strong id="alertInsumos">-</strong>
+          <span>insumos críticos</span>
+        </div>
       </div>
     </section>
 
@@ -201,6 +242,27 @@
   <!-- ===== BACKUP UPLOAD ===== -->
   <input type="file" id="backupInput" accept=".json,application/json" style="display:none">
 
+  <!-- ===== RESTORE MODAL (SELETIVO) ===== -->
+  <div class="modal-overlay" id="restoreModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-upload"></i> Restaurar Backup</h2>
+        <button class="modal-close" data-close="restoreModal" title="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="restoreSummary" class="restore-summary">-</p>
+        <p class="form-hint">Escolha quais módulos deseja restaurar. Os módulos marcados serão <strong>substituídos</strong>; os desmarcados permanecem como estão.</p>
+        <div id="restoreList" class="restore-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="restoreModal">Cancelar</button>
+        <button class="btn btn-primary" id="restoreConfirmBtn" onclick="confirmarRestauracao()">
+          <i class="fas fa-upload"></i> Restaurar selecionados
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== CONFIRM MODAL ===== -->
   <div class="modal-overlay" id="confirmModal">
     <div class="modal modal-sm">
@@ -277,6 +339,9 @@
         <button class="btn btn-success" id="turnoOutlookBtn" title="Abrir o Outlook com a mensagem e o PDF anexado prontos para enviar">
           <i class="fas fa-envelope"></i> Abrir no Outlook
         </button>
+        <button class="btn btn-success" id="turnoEmailBtn" title="Enviar o relatório direto por e-mail (SMTP, sem abrir o Outlook)">
+          <i class="fas fa-paper-plane"></i> Enviar por e-mail
+        </button>
         <button class="btn btn-primary" id="turnoDownloadBtn" title="Baixar o PDF gerado">
           <i class="fas fa-download"></i> Baixar PDF
         </button>
@@ -291,6 +356,8 @@
   <script src="js/ui.js"></script>
   <script src="js/db.js"></script>
   <script src="js/alarme.js"></script>
+  <script src="js/backup.js"></script>
+  <script src="js/backup-auto.js"></script>
   <script src="js/portaria-services-web.js"></script>
   <script src="js/dashboard.js"></script>
 </body>

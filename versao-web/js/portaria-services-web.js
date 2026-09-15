@@ -46,12 +46,37 @@
     }
   };
 
+  function readEmailOverride() {
+    try {
+      const raw = localStorage.getItem('clarityEmailConfig');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   const ConfigService = {
     getEmpresaNome() { return CONFIG.empresa.nome; },
     getNomeSistema() { return CONFIG.nomeSistema; },
-    getDestinatarios() { return [...CONFIG.email.to]; },
-    getCC() { return [...CONFIG.email.cc]; },
-    getAssuntoPadrao() { return CONFIG.assuntoPadrao; },
+    getDestinatarios() {
+      const o = readEmailOverride();
+      if (o && Array.isArray(o.to) && o.to.length) return [...o.to];
+      return [...CONFIG.email.to];
+    },
+    getCC() {
+      const o = readEmailOverride();
+      if (o && Array.isArray(o.cc)) return [...o.cc];
+      return [...CONFIG.email.cc];
+    },
+    getAssuntoPadrao() {
+      const o = readEmailOverride();
+      if (o && o.subject) return o.subject;
+      return CONFIG.assuntoPadrao;
+    },
+    getMensagemPadrao() {
+      const o = readEmailOverride();
+      return (o && o.body) ? o.body : null;
+    },
     getPastaRelatorios() { return CONFIG.pastas.relatorios; },
     getPastaBackups() { return CONFIG.pastas.backups; }
   };
@@ -291,12 +316,16 @@
      =================================================================== */
   const EmailService = {
     prepareEmail({ dateText, pdfName, pdfBlob, pdfBase64 }) {
+      const customBody = ConfigService.getMensagemPadrao();
+      const body = customBody
+        ? customBody.replace(/\{data\}/g, dateText)
+        : EmailTemplates.relatorioDiario(dateText);
       const draft = new EmailDraft();
       draft
         .setTo(ConfigService.getDestinatarios())
         .setCc(ConfigService.getCC())
         .setSubject(ConfigService.getAssuntoPadrao())
-        .setBody(EmailTemplates.relatorioDiario(dateText))
+        .setBody(body)
         .setAttachment({
           name: pdfName,
           blob: pdfBlob,
@@ -359,6 +388,15 @@
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
+  function localDateOf(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+
   function formatEpiList(e) {
     const arr = Array.isArray(e.epis) ? e.epis : [];
     if (arr.length === 0) return e.epis || '-';
@@ -384,9 +422,14 @@
     return 'ATIVA';
   }
 
-  function drawHeader(doc, pageWidth, title) {
-    doc.setFillColor(...COR_PRIMARIA);
-    doc.rect(0, 0, pageWidth, 34, 'F');
+  function logoFormat(dataUrl) {
+    const m = /^data:image\/([a-z0-9]+)/i.exec(String(dataUrl || ''));
+    if (!m) return 'PNG';
+    const f = m[1].toUpperCase();
+    return f === 'JPG' ? 'JPEG' : f;
+  }
+
+  function drawLogoPlaceholder(doc) {
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(...COR_PRIMARIA);
     doc.setLineWidth(0.5);
@@ -398,6 +441,26 @@
     doc.setTextColor(...COR_CINZA);
     doc.setFontSize(5);
     doc.text('CLARITY', 20, 20, { align: 'center' });
+  }
+
+  function drawHeader(doc, pageWidth, title) {
+    doc.setFillColor(...COR_PRIMARIA);
+    doc.rect(0, 0, pageWidth, 34, 'F');
+
+    let logo = '';
+    try {
+      logo = (typeof localStorage !== 'undefined' && localStorage.getItem('clarityLogo'))
+        || (typeof window !== 'undefined' && window.CLARITY_LOGO) || '';
+    } catch (e) { logo = ''; }
+    if (logo) {
+      try {
+        doc.addImage(logo, logoFormat(logo), 10, 7, 20, 20);
+      } catch (e) {
+        drawLogoPlaceholder(doc);
+      }
+    } else {
+      drawLogoPlaceholder(doc);
+    }
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(15);
@@ -459,8 +522,8 @@
       body: rows,
       theme: 'grid',
       styles: {
-        fontSize: 7.5,
-        cellPadding: 2,
+        fontSize: 6.5,
+        cellPadding: 1.5,
         valign: 'middle',
         textColor: COR_TEXTO,
         overflow: 'linebreak'
@@ -469,7 +532,7 @@
         fillColor: COR_PRIMARIA,
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 7.5
+        fontSize: 6.5
       },
       alternateRowStyles: {
         fillColor: [245, 247, 250]
@@ -505,11 +568,12 @@
       });
     },
 
-    async generatePeriodReport(modulesData) {
+    async generatePeriodReport(modulesData, sections) {
       return generateReport(modulesData, {
         title: 'RELATÓRIO POR PERÍODO DA PORTARIA',
         periodText: `Período: ${formatDateBR(modulesData.start)} a ${formatDateBR(modulesData.end)}`,
-        fileBase: `relatorio_periodo_portaria_${modulesData.start}_a_${modulesData.end}`
+        fileBase: `relatorio_periodo_portaria_${modulesData.start}_a_${modulesData.end}`,
+        sections
       });
     }
   };
@@ -526,12 +590,15 @@
       drawMeta(doc, pageWidth, date, opts.periodText);
 
       let y = 66;
+      const show = (key) => !opts.sections || !!opts.sections[key];
 
+      if (show('chaves')) {
       y = drawSectionTitle(doc, y, 'Controle de Chaves e Item') + 3;
       y = renderTable(
         doc, y,
-        ['Hora', 'Item', 'Funcionário', 'Devolvido por', 'Status'],
+        ['Data', 'Hora', 'Item', 'Funcionário', 'Devolvido por', 'Status'],
         (modulesData.chaves || []).map((c) => [
+          formatDateBR(c.data),
           c.hora || '-',
           c.chave || (c.veiculo ? `${c.veiculo} (${c.placa || ''})` : '-'),
           c.funcionario || '-',
@@ -541,12 +608,15 @@
         'movimentações de chaves',
         applyTable
       );
+      }
 
+      if (show('epis')) {
       y = drawSectionTitle(doc, y, 'Controle de EPIs') + 3;
       y = renderTable(
         doc, y,
-        ['Hora', 'Visitante', 'Porteiro', 'Responsável', 'EPIs', 'Status'],
+        ['Data', 'Hora', 'Visitante', 'Porteiro', 'Responsável', 'EPIs', 'Status'],
         (modulesData.epis || []).map((e) => [
+          formatDateBR(e.data),
           e.hora || '-',
           e.visitante || '-',
           e.porteiro || '-',
@@ -557,7 +627,9 @@
         'entregas de EPIs',
         applyTable
       );
+      }
 
+      if (show('insumos')) {
       y = drawSectionTitle(doc, y, 'Controle de Insumos') + 3;
       y = renderTable(
         doc, y,
@@ -570,13 +642,16 @@
         'itens de insumos',
         applyTable
       );
+      }
 
+      if (show('primeirosSocorros')) {
       y = drawSectionTitle(doc, y, 'Controle de Primeiros Socorros') + 3;
       y = renderTable(
         doc, y,
-        ['Nº', 'Hora', 'Líder', 'Setor', 'Usuário', 'Descrição'],
+        ['Nº', 'Data', 'Hora', 'Líder', 'Setor', 'Usuário', 'Descrição'],
         (modulesData.primeirosSocorros || []).map((o) => [
           o.number != null ? String(o.number) : '-',
+          formatDateBR(o.data || localDateOf(o.createdAt || o.timestamp)),
           timeFromISO(o.timestamp || o.createdAt),
           o.lider || '-',
           o.setor || '-',
@@ -586,12 +661,15 @@
         'ocorrências de primeiros socorros',
         applyTable
       );
+      }
 
+      if (show('visitantes')) {
       y = drawSectionTitle(doc, y, 'Controle de Visitantes') + 3;
       y = renderTable(
         doc, y,
-        ['Entrada', 'Saída', 'Visitante', 'Empresa', 'CPF/RG', 'Responsável', 'Setor', 'Motivo'],
+        ['Data', 'Entrada', 'Saída', 'Visitante', 'Empresa', 'CPF/RG', 'Responsável', 'Setor', 'Motivo'],
         (modulesData.visitantes || []).map((v) => [
+          formatDateBR(v.data),
           v.horaEntrada || '-',
           v.horaSaida || '-',
           v.nome || '-',
@@ -604,12 +682,15 @@
         'visitas',
         applyTable
       );
+      }
 
+      if (show('avisos')) {
       y = drawSectionTitle(doc, y, 'Avisos e Recados') + 3;
       y = renderTable(
         doc, y,
-        ['Hora', 'Porteiro', 'Deixado por', 'Texto'],
+        ['Data', 'Hora', 'Porteiro', 'Deixado por', 'Texto'],
         (modulesData.avisos || []).map((a) => [
+          formatDateBR(a.data),
           a.hora || '-',
           a.porteiro || '-',
           a.nome || '-',
@@ -618,19 +699,25 @@
         'avisos e recados',
         applyTable
       );
+      }
 
+      if (show('ocorrencias')) {
       y = drawSectionTitle(doc, y, 'Ocorrências') + 3;
       y = renderTable(
         doc, y,
-        ['Porteiro', 'Descrição'],
+        ['Data', 'Gravidade', 'Porteiro', 'Descrição'],
         (modulesData.ocorrencias || []).map((o) => [
+          formatDateBR(o.data),
+          gravidadeText(o.gravidade),
           o.porteiro || '-',
           o.descricao || '-'
         ]),
         'ocorrências',
         applyTable
       );
+      }
 
+      if (show('entradasSaidas')) {
       y = drawSectionTitle(doc, y, 'Entrada e Saída') + 3;
       y = renderTable(
         doc, y,
@@ -649,14 +736,17 @@
         'movimentações de entrada e saída',
         applyTable
       );
+      }
 
+      if (show('autorizacoes')) {
       y = drawSectionTitle(doc, y, 'Autorizações') + 3;
       y = renderTable(
         doc, y,
-        ['Hora', 'Responsável', 'Autorizado', 'Tipo', 'Período', 'Forma', 'Status'],
+        ['Data', 'Hora', 'Responsável', 'Autorizado', 'Tipo', 'Período', 'Forma', 'Status'],
         (modulesData.autorizacoes || []).map((a) => {
           const st = autorizacaoStatusText(a);
           return [
+            formatDateBR(a.data || a.dataInicial),
             (a.horaInicial) || '-',
             a.responsavelNome || '-',
             a.pessoaNome || '-',
@@ -669,6 +759,7 @@
         'autorizações',
         applyTable
       );
+      }
 
       drawFooter(doc, pageWidth, pageHeight, now);
 
@@ -726,11 +817,27 @@
     }
   }
 
-  function getFirstAidByPeriod(start, end) {
+  async function readFirstAidState() {
+    try {
+      if (typeof DB !== 'undefined' && DB.store) {
+        const rec = await DB.store('primeiros_socorros').get('state');
+        if (rec) return rec;
+      }
+    } catch (e) {
+      // segue para o fallback
+    }
     try {
       const saved = localStorage.getItem('firstAidSystem');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function getFirstAidByPeriod(start, end) {
+    try {
+      const parsed = await readFirstAidState();
+      if (!parsed) return [];
       return (parsed.occurrences || []).filter((o) => {
         const d = o.data || localDateOf(o.createdAt || o.timestamp);
         return d >= start && d <= end;
@@ -741,11 +848,10 @@
     }
   }
 
-  function getFirstAidByDate(date) {
+  async function getFirstAidByDate(date) {
     try {
-      const saved = localStorage.getItem('firstAidSystem');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
+      const parsed = await readFirstAidState();
+      if (!parsed) return [];
       return (parsed.occurrences || []).filter((o) => {
         if (o.data === date) return true;
         return localDateOf(o.createdAt || o.timestamp) === date;
@@ -756,11 +862,10 @@
     }
   }
 
-  function getFirstAidInventory() {
+  async function getFirstAidInventory() {
     try {
-      const saved = localStorage.getItem('firstAidSystem');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
+      const parsed = await readFirstAidState();
+      if (!parsed) return [];
       return Array.isArray(parsed.inventory) ? parsed.inventory : [];
     } catch (e) {
       console.warn('Falha ao ler insumos de primeiros socorros:', e);
@@ -778,6 +883,10 @@
       getByDate('entradas_saidas', date),
       getByDate('autorizacoes', date)
     ]);
+    const [primeirosSocorros, insumos] = await Promise.all([
+      getFirstAidByDate(date),
+      getFirstAidInventory()
+    ]);
     return {
       date,
       chaves,
@@ -787,12 +896,16 @@
       ocorrencias,
       entradasSaidas,
       autorizacoes,
-      primeirosSocorros: getFirstAidByDate(date),
-      insumos: getFirstAidInventory()
+      primeirosSocorros,
+      insumos
     };
   }
 
-  async function collectModulesDataByPeriod(start, end) {
+  function normTxt(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  async function collectModulesDataByPeriod(start, end, filters) {
     const [chaves, visitantes, epis, avisos, ocorrencias, entradasSaidas, autorizacoes, pessoas] = await Promise.all([
       getByPeriod('chaves', start, end),
       getByPeriod('visitantes', start, end),
@@ -803,19 +916,26 @@
       getByPeriod('autorizacoes', start, end),
       (typeof DB === 'undefined' || !DB.store) ? Promise.resolve([]) : DB.store('pessoas').getAll()
     ]);
+    const fPort = filters && filters.porteiro ? normTxt(filters.porteiro) : '';
+    const fTipo = filters && filters.tipo ? filters.tipo : '';
+    const porPorteiro = (arr) => fPort ? arr.filter((r) => normTxt(r.porteiro).includes(fPort)) : arr;
+    const [primeirosSocorros, insumos] = await Promise.all([
+      getFirstAidByPeriod(start, end),
+      getFirstAidInventory()
+    ]);
     return {
       start,
       end,
       chaves,
-      visitantes,
-      epis,
-      avisos,
-      ocorrencias,
-      entradasSaidas,
-      autorizacoes,
+      visitantes: porPorteiro(visitantes),
+      epis: porPorteiro(epis),
+      avisos: porPorteiro(avisos),
+      ocorrencias: porPorteiro(ocorrencias),
+      entradasSaidas: fTipo ? porPorteiro(entradasSaidas).filter((r) => r.tipo === fTipo) : porPorteiro(entradasSaidas),
+      autorizacoes: fTipo ? autorizacoes.filter((a) => a.pessoaTipo === fTipo) : autorizacoes,
       pessoas,
-      primeirosSocorros: getFirstAidByPeriod(start, end),
-      insumos: getFirstAidInventory()
+      primeirosSocorros,
+      insumos
     };
   }
 
@@ -836,6 +956,11 @@
 
   function fmtData(s) {
     return formatDateBR(s);
+  }
+
+  const GRAVIDADE_LABEL = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+  function gravidadeText(g) {
+    return GRAVIDADE_LABEL[g] || 'Média';
   }
 
   function buildSheets(m) {
@@ -928,11 +1053,13 @@
 
     sheets.push({
       name: 'Ocorrências',
-      cols: ['Data', 'Porteiro', 'Descrição'],
+      cols: ['Data', 'Gravidade', 'Porteiro', 'Descrição', 'Fotos'],
       rows: (m.ocorrencias || []).slice().sort(byDataHora).map((o) => [
         fmtData(o.data),
+        gravidadeText(o.gravidade),
         o.porteiro || '-',
-        o.descricao || '-'
+        o.descricao || '-',
+        Array.isArray(o.fotos) ? o.fotos.length : 0
       ])
     });
 
@@ -1029,15 +1156,15 @@
       return { date, dateText, modulesData, pdf, draft };
     },
 
-    async preparePeriodReport(start, end) {
-      const modulesData = await collectModulesDataByPeriod(start, end);
-      const pdf = await PdfService.generatePeriodReport(modulesData);
+    async preparePeriodReport(start, end, sections, filters) {
+      const modulesData = await collectModulesDataByPeriod(start, end, filters);
+      const pdf = await PdfService.generatePeriodReport(modulesData, sections);
       const periodText = `${formatDateBR2(start)} a ${formatDateBR2(end)}`;
       return { start, end, periodText, modulesData, pdf };
     },
 
-    async preparePeriodExcel(start, end) {
-      const modulesData = await collectModulesDataByPeriod(start, end);
+    async preparePeriodExcel(start, end, filters) {
+      const modulesData = await collectModulesDataByPeriod(start, end, filters);
       const excelBlob = await buildWorkbookXlsx(modulesData);
       const excelBase64 = await FileService.blobToBase64(excelBlob);
       const excelName = `relatorio_excel_periodo_${start}_a_${end}.xlsx`;

@@ -39,6 +39,19 @@ const CONFIG = {
   }
 };
 
+/**
+ * Lê a configuração de e-mail salva pela tela de Configurações
+ * (localStorage `clarityEmailConfig`), com fallback para os padrões acima.
+ */
+function readEmailOverride() {
+  try {
+    const raw = localStorage.getItem('clarityEmailConfig');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export const ConfigService = {
   getEmpresaNome() {
     return CONFIG.empresa.nome;
@@ -49,15 +62,27 @@ export const ConfigService = {
   },
 
   getDestinatarios() {
+    const o = readEmailOverride();
+    if (o && Array.isArray(o.to) && o.to.length) return [...o.to];
     return [...CONFIG.email.to];
   },
 
   getCC() {
+    const o = readEmailOverride();
+    if (o && Array.isArray(o.cc)) return [...o.cc];
     return [...CONFIG.email.cc];
   },
 
   getAssuntoPadrao() {
+    const o = readEmailOverride();
+    if (o && o.subject) return o.subject;
     return CONFIG.assuntoPadrao;
+  },
+
+  /** Mensagem personalizada (null = usar o template padrão). */
+  getMensagemPadrao() {
+    const o = readEmailOverride();
+    return (o && o.body) ? o.body : null;
   },
 
   getPastaRelatorios() {

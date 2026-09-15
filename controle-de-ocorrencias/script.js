@@ -12,6 +12,23 @@ const $ = (sel) => document.querySelector(sel);
 let records = [];
 let editingId = null;
 let lastSelectedId = null;
+let formFotos = []; // fotos (data URLs) do formulário atual
+
+const GRAVIDADES = {
+  baixa: { label: 'Baixa', badge: 'badge-success' },
+  media: { label: 'Média', badge: 'badge-info' },
+  alta: { label: 'Alta', badge: 'badge-warning' },
+  critica: { label: 'Crítica', badge: 'badge-danger' }
+};
+
+function gravidadeLabel(g) {
+  return (GRAVIDADES[g] || GRAVIDADES.media).label;
+}
+
+function gravidadeBadge(g) {
+  const info = GRAVIDADES[g] || GRAVIDADES.media;
+  return `<span class="badge ${info.badge}">${info.label}</span>`;
+}
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -33,6 +50,67 @@ function bindEvents() {
     e.preventDefault();
     save();
   });
+  const fotosInput = $('#occFotos');
+  if (fotosInput) fotosInput.addEventListener('change', handleFotosInput);
+}
+
+// ===== FOTOS =====
+/** Redimensiona/comprime a imagem para caber no registro (data URL JPEG). */
+function fileToResizedDataUrl(file, maxDim = 1000, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        const scale = Math.min(1, maxDim / width, maxDim / height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Imagem inválida'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFotosInput(event) {
+  const files = Array.from(event.target.files || []);
+  for (const file of files) {
+    try {
+      formFotos.push(await fileToResizedDataUrl(file));
+    } catch (e) {
+      UI.showToast('Não foi possível ler a imagem: ' + file.name, 'error');
+    }
+  }
+  event.target.value = '';
+  renderFotosPreview();
+}
+
+function removeFoto(index) {
+  formFotos.splice(index, 1);
+  renderFotosPreview();
+}
+
+function renderFotosPreview() {
+  const box = $('#occFotosPreview');
+  if (!box) return;
+  if (!formFotos.length) {
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = formFotos.map((src, i) => `
+    <div class="occ-foto-thumb">
+      <img src="${src}" alt="Foto ${i + 1}">
+      <button type="button" onclick="removeFoto(${i})" title="Remover foto">&times;</button>
+    </div>
+  `).join('');
 }
 
 // ===== LOAD =====
@@ -46,6 +124,8 @@ function collectForm() {
   return {
     data: $('#occData').value,
     porteiro: $('#occPorteiro').value.trim(),
+    gravidade: $('#occGravidade').value || 'media',
+    fotos: formFotos.slice(),
     descricao: $('#occDescricao').value.trim()
   };
 }
@@ -53,6 +133,9 @@ function collectForm() {
 function fillForm(r) {
   $('#occData').value = r.data || '';
   $('#occPorteiro').value = r.porteiro || '';
+  $('#occGravidade').value = r.gravidade || 'media';
+  formFotos = Array.isArray(r.fotos) ? r.fotos.slice() : [];
+  renderFotosPreview();
   $('#occDescricao').value = r.descricao || '';
 }
 
@@ -92,6 +175,9 @@ function clearForm() {
   editingId = null;
   $('#occData').value = UI.todayISO();
   $('#occPorteiro').value = '';
+  $('#occGravidade').value = 'media';
+  formFotos = [];
+  renderFotosPreview();
   $('#occDescricao').value = '';
 }
 
@@ -147,16 +233,30 @@ function viewRecord(id) {
   const body = $('#viewModalBody');
   const rows = [
     ['Data', UI.formatDate(r.data)],
+    ['Gravidade', gravidadeBadge(r.gravidade)],
     ['Nome do Porteiro', UI.escHtml(r.porteiro)],
     ['Descrição da ocorrência', UI.escHtml(r.descricao)]
   ];
 
-  body.innerHTML = rows.map(([label, value]) => `
+  let html = rows.map(([label, value]) => `
     <div class="detail-row">
       <span class="detail-label">${label}</span>
       <span class="detail-value">${value}</span>
     </div>
   `).join('');
+
+  const fotos = Array.isArray(r.fotos) ? r.fotos : [];
+  if (fotos.length) {
+    html += `
+      <div class="detail-divider"></div>
+      <div class="detail-section-title"><i class="fas fa-camera"></i> Fotos (${fotos.length})</div>
+      <div class="occ-fotos-view">
+        ${fotos.map((src, i) => `<a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="Foto ${i + 1}"></a>`).join('')}
+      </div>
+    `;
+  }
+
+  body.innerHTML = html;
 
   UI.openModal('viewModal');
 }
@@ -195,10 +295,13 @@ function renderHistory() {
 
   filtered.forEach((r) => {
     const tr = document.createElement('tr');
+    const nFotos = Array.isArray(r.fotos) ? r.fotos.length : 0;
+    const fotoIcon = nFotos ? ` <i class="fas fa-camera" title="${nFotos} foto(s)"></i>` : '';
     tr.innerHTML = `
       <td>${UI.formatDate(r.data)}</td>
+      <td>${gravidadeBadge(r.gravidade)}</td>
       <td>${UI.escHtml(r.porteiro)}</td>
-      <td>${UI.escHtml(r.descricao)}</td>
+      <td>${UI.escHtml(r.descricao)}${fotoIcon}</td>
       <td>
         <div class="action-btns">
           <button class="btn btn-sm btn-info" onclick="viewRecord('${r.id}')" title="Visualizar">
@@ -221,6 +324,7 @@ function renderHistory() {
 function buildRows(list) {
   return list.map((r) => [
     UI.formatDate(r.data),
+    gravidadeLabel(r.gravidade),
     r.porteiro || '-',
     r.descricao || '-'
   ]);
@@ -235,7 +339,7 @@ function generateDayReport() {
     title: 'OCORRÊNCIAS',
     subtitle: 'Relatório do Dia',
     period: UI.formatDate(today),
-    columns: ['Data', 'Porteiro', 'Descrição'],
+    columns: ['Data', 'Gravidade', 'Porteiro', 'Descrição'],
     rows: buildRows(list),
     filename: `relatorio_ocorrencias_dia_${today}.pdf`
   });
@@ -255,7 +359,7 @@ function generatePeriodReport(start, end) {
     title: 'OCORRÊNCIAS',
     subtitle: 'Relatório por Período',
     period: `${UI.formatDate(start)} a ${UI.formatDate(end)}`,
-    columns: ['Data', 'Porteiro', 'Descrição'],
+    columns: ['Data', 'Gravidade', 'Porteiro', 'Descrição'],
     rows: buildRows(list),
     filename: `relatorio_ocorrencias_${start}_a_${end}.pdf`
   });
@@ -265,8 +369,10 @@ function generatePeriodReport(start, end) {
 function exportExcelOcorrencias() {
   const rows = getFiltered().map((r) => ({
     'Data': UI.formatDate(r.data),
+    'Gravidade': gravidadeLabel(r.gravidade),
     'Porteiro': r.porteiro || '',
-    'Descrição da ocorrência': r.descricao || ''
+    'Descrição da ocorrência': r.descricao || '',
+    'Fotos': Array.isArray(r.fotos) ? r.fotos.length : 0
   }));
   UI.exportExcel(rows, Object.keys(rows[0] || {}), `ocorrencias_${UI.todayISO()}.xlsx`);
 }

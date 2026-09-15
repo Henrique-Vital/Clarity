@@ -8,7 +8,7 @@
 
 const DB = (() => {
   const DB_NAME = 'clarityPortaria';
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
 
   // Esquema das Stores. Cada módulo tem a sua.
   const SCHEMA = {
@@ -75,6 +75,11 @@ const DB = (() => {
       ]
     },
     config: {
+      keyPath: 'id'
+    },
+    // Estado do módulo de Primeiros Socorros (inventário + ocorrências),
+    // antes guardado apenas em localStorage.
+    primeiros_socorros: {
       keyPath: 'id'
     }
   };

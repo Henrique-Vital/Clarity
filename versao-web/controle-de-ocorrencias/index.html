@@ -105,6 +105,25 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label for="occGravidade">Gravidade</label>
+            <select id="occGravidade">
+              <option value="baixa">Baixa</option>
+              <option value="media" selected>Média</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Crítica</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="occFotos">Fotos (opcional)</label>
+            <input type="file" id="occFotos" accept="image/*" multiple>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="occ-fotos-preview" id="occFotosPreview"></div>
+        </div>
+
         <div class="form-group">
           <label for="occDescricao">Descrição completa da ocorrência <span class="required">*</span></label>
           <textarea id="occDescricao" rows="5" placeholder="Descreva detalhadamente a ocorrência..." required></textarea>
@@ -146,6 +165,7 @@
           <thead>
             <tr>
               <th>Data</th>
+              <th>Gravidade</th>
               <th>Porteiro</th>
               <th>Descrição</th>
               <th>Ações</th>
@@ -242,6 +262,8 @@
   <script src="../js/ui.js"></script>
   <script src="../js/db.js"></script>
   <script src="../js/alarme.js"></script>
+  <script src="../js/backup.js"></script>
+  <script src="../js/backup-auto.js"></script>
   <script src="../js/portaria-services-web.js"></script>
   <script src="script.js"></script>
 </body>

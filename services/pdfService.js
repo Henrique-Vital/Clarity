@@ -66,12 +66,28 @@ function timeFromISO(iso) {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Data local YYYY-MM-DD de uma data ISO (para registros com timestamp). */
+function localDateOf(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 /** Lista de EPIs com quantidade (Capacete x3), quando informada. */
 function formatEpiList(e) {
   const arr = Array.isArray(e.epis) ? e.epis : [];
   if (arr.length === 0) return e.epis || '-';
   const qtd = e.episQtd || {};
   return arr.map((nome) => (qtd[nome] > 1 ? `${nome} x${qtd[nome]}` : nome)).join(', ');
+}
+
+/** Rótulo da gravidade de uma ocorrência. */
+function gravidadeText(g) {
+  const map = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+  return map[g] || 'Média';
 }
 
 /** Situação de um insumo com base na quantidade restante. */
@@ -94,12 +110,16 @@ function autorizacaoStatusText(a) {
   return 'ATIVA';
 }
 
-/** Desenha o cabeçalho azul com logo (placeholder) e título. */
-function drawHeader(doc, pageWidth, title) {
-  doc.setFillColor(...COR_PRIMARIA);
-  doc.rect(0, 0, pageWidth, 34, 'F');
+/** Extrai o formato (PNG/JPEG) de um data URL de imagem. */
+function logoFormat(dataUrl) {
+  const m = /^data:image\/([a-z0-9]+)/i.exec(String(dataUrl || ''));
+  if (!m) return 'PNG';
+  const f = m[1].toUpperCase();
+  return f === 'JPG' ? 'JPEG' : f;
+}
 
-  // Logo placeholder (a logo oficial será incluída no futuro).
+/** Desenha o placeholder de logo (usado apenas se não houver logo). */
+function drawLogoPlaceholder(doc) {
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...COR_PRIMARIA);
   doc.setLineWidth(0.5);
@@ -111,6 +131,28 @@ function drawHeader(doc, pageWidth, title) {
   doc.setTextColor(...COR_CINZA);
   doc.setFontSize(5);
   doc.text('CLARITY', 20, 20, { align: 'center' });
+}
+
+/** Desenha o cabeçalho azul com a logo real (ou placeholder) e o título. */
+function drawHeader(doc, pageWidth, title) {
+  doc.setFillColor(...COR_PRIMARIA);
+  doc.rect(0, 0, pageWidth, 34, 'F');
+
+  // Logo: personalizada (localStorage) ou a logo padrão embutida (js/logo.js).
+  let logo = '';
+  try {
+    logo = (typeof localStorage !== 'undefined' && localStorage.getItem('clarityLogo'))
+      || (typeof window !== 'undefined' && window.CLARITY_LOGO) || '';
+  } catch (e) { logo = ''; }
+  if (logo) {
+    try {
+      doc.addImage(logo, logoFormat(logo), 10, 7, 20, 20);
+    } catch (e) {
+      drawLogoPlaceholder(doc);
+    }
+  } else {
+    drawLogoPlaceholder(doc);
+  }
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(15);
@@ -179,8 +221,8 @@ function renderTable(doc, y, columns, rows, emptyLabel, applyTable) {
     body: rows,
     theme: 'grid',
     styles: {
-      fontSize: 7.5,
-      cellPadding: 2,
+      fontSize: 6.5,
+      cellPadding: 1.5,
       valign: 'middle',
       textColor: COR_TEXTO,
       overflow: 'linebreak'
@@ -189,7 +231,7 @@ function renderTable(doc, y, columns, rows, emptyLabel, applyTable) {
       fillColor: COR_PRIMARIA,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 7.5
+      fontSize: 6.5
     },
     alternateRowStyles: {
       fillColor: [245, 247, 250]
@@ -236,11 +278,12 @@ export const PdfService = {
    * @param {Object} modulesData - Dados com { start, end, ...módulos }.
    * @returns {Promise<{pdfBlob: Blob, pdfName: string, pdfBase64: string}>}
    */
-  async generatePeriodReport(modulesData) {
+  async generatePeriodReport(modulesData, sections) {
     return generateReport(modulesData, {
       title: 'RELATÓRIO POR PERÍODO DA PORTARIA',
       periodText: `Período: ${formatDateBR(modulesData.start)} a ${formatDateBR(modulesData.end)}`,
-      fileBase: `relatorio_periodo_portaria_${modulesData.start}_a_${modulesData.end}`
+      fileBase: `relatorio_periodo_portaria_${modulesData.start}_a_${modulesData.end}`,
+      sections
     });
   }
 };
@@ -258,158 +301,185 @@ async function generateReport(modulesData, opts) {
     drawMeta(doc, pageWidth, date, opts.periodText);
 
     let y = 66;
+    const show = (key) => !opts.sections || !!opts.sections[key];
 
     // ===== Controle de Chaves ou Item =====
-    y = drawSectionTitle(doc, y, 'Controle de Chaves e Item') + 3;
-    y = renderTable(
-      doc, y,
-      ['Hora', 'Item', 'Funcionário', 'Devolvido por', 'Status'],
-      (modulesData.chaves || []).map((c) => [
-        c.hora || '-',
-        c.chave || (c.veiculo ? `${c.veiculo} (${c.placa || ''})` : '-'),
-        c.funcionario || '-',
-        c.status === 'devolvida' ? (c.retornoFuncionario || '-') : '-',
-        c.status === 'devolvida' ? 'Devolvida' : 'Em uso'
-      ]),
-      'movimentações de chaves',
-      applyTable
-    );
+    if (show('chaves')) {
+      y = drawSectionTitle(doc, y, 'Controle de Chaves e Item') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Hora', 'Item', 'Funcionário', 'Devolvido por', 'Status'],
+        (modulesData.chaves || []).map((c) => [
+          formatDateBR(c.data),
+          c.hora || '-',
+          c.chave || (c.veiculo ? `${c.veiculo} (${c.placa || ''})` : '-'),
+          c.funcionario || '-',
+          c.status === 'devolvida' ? (c.retornoFuncionario || '-') : '-',
+          c.status === 'devolvida' ? 'Devolvida' : 'Em uso'
+        ]),
+        'movimentações de chaves',
+        applyTable
+      );
+    }
 
     // ===== CONTROLE DE EPIs =====
-    y = drawSectionTitle(doc, y, 'Controle de EPIs') + 3;
-    y = renderTable(
-      doc, y,
-      ['Hora', 'Visitante', 'Porteiro', 'Responsável', 'EPIs', 'Status'],
-      (modulesData.epis || []).map((e) => [
-        e.hora || '-',
-        e.visitante || '-',
-        e.porteiro || '-',
-        e.responsavel || '-',
-        formatEpiList(e),
-        e.status === 'devolvido' ? 'Devolvido' : 'Pendente'
-      ]),
-      'entregas de EPIs',
-      applyTable
-    );
+    if (show('epis')) {
+      y = drawSectionTitle(doc, y, 'Controle de EPIs') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Hora', 'Visitante', 'Porteiro', 'Responsável', 'EPIs', 'Status'],
+        (modulesData.epis || []).map((e) => [
+          formatDateBR(e.data),
+          e.hora || '-',
+          e.visitante || '-',
+          e.porteiro || '-',
+          e.responsavel || '-',
+          formatEpiList(e),
+          e.status === 'devolvido' ? 'Devolvido' : 'Pendente'
+        ]),
+        'entregas de EPIs',
+        applyTable
+      );
+    }
 
     // ===== CONTROLE DE INSUMOS =====
-    y = drawSectionTitle(doc, y, 'Controle de Insumos') + 3;
-    y = renderTable(
-      doc, y,
-      ['Item', 'Qtd. Restante', 'Situação'],
-      (modulesData.insumos || []).map((i) => [
-        i.item || '-',
-        i.remaining != null ? String(i.remaining) : '-',
-        insumoStatusText(i.remaining)
-      ]),
-      'itens de insumos',
-      applyTable
-    );
+    if (show('insumos')) {
+      y = drawSectionTitle(doc, y, 'Controle de Insumos') + 3;
+      y = renderTable(
+        doc, y,
+        ['Item', 'Qtd. Restante', 'Situação'],
+        (modulesData.insumos || []).map((i) => [
+          i.item || '-',
+          i.remaining != null ? String(i.remaining) : '-',
+          insumoStatusText(i.remaining)
+        ]),
+        'itens de insumos',
+        applyTable
+      );
+    }
 
     // ===== CONTROLE DE PRIMEIROS SOCORROS =====
-    y = drawSectionTitle(doc, y, 'Controle de Primeiros Socorros') + 3;
-    y = renderTable(
-      doc, y,
-      ['Nº', 'Hora', 'Líder', 'Setor', 'Usuário', 'Descrição'],
-      (modulesData.primeirosSocorros || []).map((o) => [
-        o.number != null ? String(o.number) : '-',
-        timeFromISO(o.timestamp || o.createdAt),
-        o.lider || '-',
-        o.setor || '-',
-        o.usuario || '-',
-        o.descricao || '-'
-      ]),
-      'ocorrências de primeiros socorros',
-      applyTable
-    );
+    if (show('primeirosSocorros')) {
+      y = drawSectionTitle(doc, y, 'Controle de Primeiros Socorros') + 3;
+      y = renderTable(
+        doc, y,
+        ['Nº', 'Data', 'Hora', 'Líder', 'Setor', 'Usuário', 'Descrição'],
+        (modulesData.primeirosSocorros || []).map((o) => [
+          o.number != null ? String(o.number) : '-',
+          formatDateBR(o.data || localDateOf(o.createdAt || o.timestamp)),
+          timeFromISO(o.timestamp || o.createdAt),
+          o.lider || '-',
+          o.setor || '-',
+          o.usuario || '-',
+          o.descricao || '-'
+        ]),
+        'ocorrências de primeiros socorros',
+        applyTable
+      );
+    }
 
     // ===== CONTROLE DE VISITANTES =====
-    y = drawSectionTitle(doc, y, 'Controle de Visitantes') + 3;
-    y = renderTable(
-      doc, y,
-      ['Entrada', 'Saída', 'Visitante', 'Empresa', 'CPF/RG', 'Responsável', 'Setor', 'Motivo'],
-      (modulesData.visitantes || []).map((v) => [
-        v.horaEntrada || '-',
-        v.horaSaida || '-',
-        v.nome || '-',
-        v.empresa || '-',
-        v.cpfRg || '-',
-        v.responsavel || '-',
-        v.setor || '-',
-        v.motivo || '-'
-      ]),
-      'visitas',
-      applyTable
-    );
+    if (show('visitantes')) {
+      y = drawSectionTitle(doc, y, 'Controle de Visitantes') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Entrada', 'Saída', 'Visitante', 'Empresa', 'CPF/RG', 'Responsável', 'Setor', 'Motivo'],
+        (modulesData.visitantes || []).map((v) => [
+          formatDateBR(v.data),
+          v.horaEntrada || '-',
+          v.horaSaida || '-',
+          v.nome || '-',
+          v.empresa || '-',
+          v.cpfRg || '-',
+          v.responsavel || '-',
+          v.setor || '-',
+          v.motivo || '-'
+        ]),
+        'visitas',
+        applyTable
+      );
+    }
 
     // ===== CONTROLE DE AVISOS E RECADOS =====
-    y = drawSectionTitle(doc, y, 'Avisos e Recados') + 3;
-    y = renderTable(
-      doc, y,
-      ['Hora', 'Porteiro', 'Deixado por', 'Texto'],
-      (modulesData.avisos || []).map((a) => [
-        a.hora || '-',
-        a.porteiro || '-',
-        a.nome || '-',
-        a.texto || '-'
-      ]),
-      'avisos e recados',
-      applyTable
-    );
+    if (show('avisos')) {
+      y = drawSectionTitle(doc, y, 'Avisos e Recados') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Hora', 'Porteiro', 'Deixado por', 'Texto'],
+        (modulesData.avisos || []).map((a) => [
+          formatDateBR(a.data),
+          a.hora || '-',
+          a.porteiro || '-',
+          a.nome || '-',
+          a.texto || '-'
+        ]),
+        'avisos e recados',
+        applyTable
+      );
+    }
 
     // ===== CONTROLE DE OCORRÊNCIAS =====
-    y = drawSectionTitle(doc, y, 'Ocorrências') + 3;
-    y = renderTable(
-      doc, y,
-      ['Porteiro', 'Descrição'],
-      (modulesData.ocorrencias || []).map((o) => [
-        o.porteiro || '-',
-        o.descricao || '-'
-      ]),
-      'ocorrências',
-      applyTable
-    );
+    if (show('ocorrencias')) {
+      y = drawSectionTitle(doc, y, 'Ocorrências') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Gravidade', 'Porteiro', 'Descrição'],
+        (modulesData.ocorrencias || []).map((o) => [
+          formatDateBR(o.data),
+          gravidadeText(o.gravidade),
+          o.porteiro || '-',
+          o.descricao || '-'
+        ]),
+        'ocorrências',
+        applyTable
+      );
+    }
 
     // ===== ENTRADA E SAÍDA =====
-    y = drawSectionTitle(doc, y, 'Entrada e Saída') + 3;
-    y = renderTable(
-      doc, y,
-      ['Data', 'Entrada', 'Saída', 'Pessoa', 'Tipo', 'Doc.', 'Porteiro', 'Responsável', 'Situação'],
-      (modulesData.entradasSaidas || []).map((r) => [
-        formatDateBR(r.data),
-        r.horaEntrada || '-',
-        r.horaSaida || '-',
-        r.nome || '-',
-        r.tipo || '-',
-        r.documento || '-',
-        r.porteiro || '-',
-        r.responsavel || '-',
-        r.status === 'fora' ? 'Fora' : 'Dentro'
-      ]),
-      'movimentações de entrada e saída',
-      applyTable
-    );
+    if (show('entradasSaidas')) {
+      y = drawSectionTitle(doc, y, 'Entrada e Saída') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Entrada', 'Saída', 'Pessoa', 'Tipo', 'Doc.', 'Porteiro', 'Responsável', 'Situação'],
+        (modulesData.entradasSaidas || []).map((r) => [
+          formatDateBR(r.data),
+          r.horaEntrada || '-',
+          r.horaSaida || '-',
+          r.nome || '-',
+          r.tipo || '-',
+          r.documento || '-',
+          r.porteiro || '-',
+          r.responsavel || '-',
+          r.status === 'fora' ? 'Fora' : 'Dentro'
+        ]),
+        'movimentações de entrada e saída',
+        applyTable
+      );
+    }
 
     // ===== AUTORIZAÇÕES =====
-    y = drawSectionTitle(doc, y, 'Autorizações') + 3;
-    y = renderTable(
-      doc, y,
-      ['Hora', 'Responsável', 'Autorizado', 'Tipo', 'Período', 'Forma', 'Status'],
-      (modulesData.autorizacoes || []).map((a) => {
-        const st = autorizacaoStatusText(a);
-        return [
-          (a.horaInicial) || '-',
-          a.responsavelNome || '-',
-          a.pessoaNome || '-',
-          a.pessoaTipo || '-',
-          `${formatDateBR(a.dataInicial)} ${a.horaInicial || ''} a ${formatDateBR(a.dataFinal)} ${a.horaFinal || ''}`,
-          a.forma || '-',
-          st
-        ];
-      }),
-      'autorizações',
-      applyTable
-    );
+    if (show('autorizacoes')) {
+      y = drawSectionTitle(doc, y, 'Autorizações') + 3;
+      y = renderTable(
+        doc, y,
+        ['Data', 'Hora', 'Responsável', 'Autorizado', 'Tipo', 'Período', 'Forma', 'Status'],
+        (modulesData.autorizacoes || []).map((a) => {
+          const st = autorizacaoStatusText(a);
+          return [
+            formatDateBR(a.data || a.dataInicial),
+            (a.horaInicial) || '-',
+            a.responsavelNome || '-',
+            a.pessoaNome || '-',
+            a.pessoaTipo || '-',
+            `${formatDateBR(a.dataInicial)} ${a.horaInicial || ''} a ${formatDateBR(a.dataFinal)} ${a.horaFinal || ''}`,
+            a.forma || '-',
+            st
+          ];
+        }),
+        'autorizações',
+        applyTable
+      );
+    }
 
     drawFooter(doc, pageWidth, pageHeight, now);
 

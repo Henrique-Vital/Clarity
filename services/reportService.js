@@ -66,12 +66,32 @@ async function getByPeriod(storeName, start, end) {
   }
 }
 
-/** Lê as ocorrências de primeiros socorros (LocalStorage do módulo existente). */
-function getFirstAidByDate(date) {
+/**
+ * Lê o estado de Primeiros Socorros do IndexedDB (fonte principal),
+ * com fallback para o localStorage legado (compatibilidade/migração).
+ */
+async function readFirstAidState() {
+  try {
+    if (typeof DB !== 'undefined' && DB.store) {
+      const rec = await DB.store('primeiros_socorros').get('state');
+      if (rec) return rec;
+    }
+  } catch (e) {
+    // segue para o fallback
+  }
   try {
     const saved = localStorage.getItem('firstAidSystem');
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Ocorrências de primeiros socorros de uma data. */
+async function getFirstAidByDate(date) {
+  try {
+    const parsed = await readFirstAidState();
+    if (!parsed) return [];
     return (parsed.occurrences || []).filter((o) => {
       if (o.data === date) return true;
       return localDateOf(o.createdAt || o.timestamp) === date;
@@ -82,12 +102,11 @@ function getFirstAidByDate(date) {
   }
 }
 
-/** Lê as ocorrências de primeiros socorros (LocalStorage do módulo existente) por período. */
-function getFirstAidByPeriod(start, end) {
+/** Ocorrências de primeiros socorros de um período. */
+async function getFirstAidByPeriod(start, end) {
   try {
-    const saved = localStorage.getItem('firstAidSystem');
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
+    const parsed = await readFirstAidState();
+    if (!parsed) return [];
     return (parsed.occurrences || []).filter((o) => {
       const d = o.data || localDateOf(o.createdAt || o.timestamp);
       return d >= start && d <= end;
@@ -98,12 +117,11 @@ function getFirstAidByPeriod(start, end) {
   }
 }
 
-/** Lê o estoque de insumos de primeiros socorros (LocalStorage do módulo existente). */
-function getFirstAidInventory() {
+/** Estoque de insumos de primeiros socorros. */
+async function getFirstAidInventory() {
   try {
-    const saved = localStorage.getItem('firstAidSystem');
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
+    const parsed = await readFirstAidState();
+    if (!parsed) return [];
     return Array.isArray(parsed.inventory) ? parsed.inventory : [];
   } catch (e) {
     console.warn('Falha ao ler insumos de primeiros socorros:', e);
@@ -122,6 +140,10 @@ async function collectModulesData(date) {
     getByDate('entradas_saidas', date),
     getByDate('autorizacoes', date)
   ]);
+  const [primeirosSocorros, insumos] = await Promise.all([
+    getFirstAidByDate(date),
+    getFirstAidInventory()
+  ]);
   return {
     date,
     chaves,
@@ -131,13 +153,18 @@ async function collectModulesData(date) {
     ocorrencias,
     entradasSaidas,
     autorizacoes,
-    primeirosSocorros: getFirstAidByDate(date),
-    insumos: getFirstAidInventory()
+    primeirosSocorros,
+    insumos
   };
 }
 
+/** Normaliza texto para comparação (minúsculas, sem acentos). */
+function normTxt(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 /** Coleta os dados de todos os módulos referentes a um período. */
-async function collectModulesDataByPeriod(start, end) {
+async function collectModulesDataByPeriod(start, end, filters) {
   const [chaves, visitantes, epis, avisos, ocorrencias, entradasSaidas, autorizacoes, pessoas] = await Promise.all([
     getByPeriod('chaves', start, end),
     getByPeriod('visitantes', start, end),
@@ -148,19 +175,29 @@ async function collectModulesDataByPeriod(start, end) {
     getByPeriod('autorizacoes', start, end),
     (typeof DB === 'undefined' || !DB.store) ? Promise.resolve([]) : DB.store('pessoas').getAll()
   ]);
+
+  const fPort = filters && filters.porteiro ? normTxt(filters.porteiro) : '';
+  const fTipo = filters && filters.tipo ? filters.tipo : '';
+  const porPorteiro = (arr) => fPort ? arr.filter((r) => normTxt(r.porteiro).includes(fPort)) : arr;
+
+  const [primeirosSocorros, insumos] = await Promise.all([
+    getFirstAidByPeriod(start, end),
+    getFirstAidInventory()
+  ]);
+
   return {
     start,
     end,
     chaves,
-    visitantes,
-    epis,
-    avisos,
-    ocorrencias,
-    entradasSaidas,
-    autorizacoes,
+    visitantes: porPorteiro(visitantes),
+    epis: porPorteiro(epis),
+    avisos: porPorteiro(avisos),
+    ocorrencias: porPorteiro(ocorrencias),
+    entradasSaidas: fTipo ? porPorteiro(entradasSaidas).filter((r) => r.tipo === fTipo) : porPorteiro(entradasSaidas),
+    autorizacoes: fTipo ? autorizacoes.filter((a) => a.pessoaTipo === fTipo) : autorizacoes,
     pessoas,
-    primeirosSocorros: getFirstAidByPeriod(start, end),
-    insumos: getFirstAidInventory()
+    primeirosSocorros,
+    insumos
   };
 }
 
@@ -192,6 +229,11 @@ function byDataHora(a, b) {
 
 function fmtData(s) {
   return formatDateBR(s);
+}
+
+const GRAVIDADE_LABEL = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+function gravidadeText(g) {
+  return GRAVIDADE_LABEL[g] || 'Média';
 }
 
 /** Monta as abas da planilha (uma por funcionalidade do sistema). */
@@ -285,11 +327,13 @@ function buildSheets(m) {
 
   sheets.push({
     name: 'Ocorrências',
-    cols: ['Data', 'Porteiro', 'Descrição'],
+    cols: ['Data', 'Gravidade', 'Porteiro', 'Descrição', 'Fotos'],
     rows: (m.ocorrencias || []).slice().sort(byDataHora).map((o) => [
       fmtData(o.data),
+      gravidadeText(o.gravidade),
       o.porteiro || '-',
-      o.descricao || '-'
+      o.descricao || '-',
+      Array.isArray(o.fotos) ? o.fotos.length : 0
     ])
   });
 
@@ -402,9 +446,9 @@ export const ReportService = {
    * Prepara o relatório por período de todos os módulos (PDF).
    * @returns {Promise<{start, end, periodText, modulesData, pdf}>}
    */
-  async preparePeriodReport(start, end) {
-    const modulesData = await collectModulesDataByPeriod(start, end);
-    const pdf = await PdfService.generatePeriodReport(modulesData);
+  async preparePeriodReport(start, end, sections, filters) {
+    const modulesData = await collectModulesDataByPeriod(start, end, filters);
+    const pdf = await PdfService.generatePeriodReport(modulesData, sections);
     const periodText = `${formatDateBR(start)} a ${formatDateBR(end)}`;
     return { start, end, periodText, modulesData, pdf };
   },
@@ -413,8 +457,8 @@ export const ReportService = {
    * Prepara a planilha Excel geral do período (uma aba por módulo).
    * @returns {Promise<{start, end, excelBlob, excelName, excelBase64, modulesData}>}
    */
-  async preparePeriodExcel(start, end) {
-    const modulesData = await collectModulesDataByPeriod(start, end);
+  async preparePeriodExcel(start, end, filters) {
+    const modulesData = await collectModulesDataByPeriod(start, end, filters);
     const excelBlob = await buildWorkbookXlsx(modulesData);
     const excelBase64 = await FileService.blobToBase64(excelBlob);
     const excelName = `relatorio_excel_periodo_${start}_a_${end}.xlsx`;

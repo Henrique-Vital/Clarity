@@ -6,3 +6,6 @@ out/
 
 # Pacotes de build grandes
 *.zip
+
+# Pasta de saída (PDFs e backups gerados pelo sistema)
+controle-da-portaria/

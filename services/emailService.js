@@ -24,12 +24,16 @@ export const EmailService = {
    * @returns {EmailDraft}
    */
   prepareEmail({ dateText, pdfName, pdfBlob, pdfBase64 }) {
+    const customBody = ConfigService.getMensagemPadrao();
+    const body = customBody
+      ? customBody.replace(/\{data\}/g, dateText)
+      : EmailTemplates.relatorioDiario(dateText);
     const draft = new EmailDraft();
     draft
       .setTo(ConfigService.getDestinatarios())
       .setCc(ConfigService.getCC())
       .setSubject(ConfigService.getAssuntoPadrao())
-      .setBody(EmailTemplates.relatorioDiario(dateText))
+      .setBody(body)
       .setAttachment({
         name: pdfName,
         blob: pdfBlob,

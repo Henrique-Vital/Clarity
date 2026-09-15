@@ -2170,6 +2170,157 @@ Todas as alterações foram aplicadas na **raiz (Electron)** e espelhadas em **`
 - Entrada e Saída: responsável/ autorizador no card da pessoa e "Registrar Entrada" grava direto, sem modal; edição segue pelo modal.
 - Tudo aplicado na raiz e na `versao-web`; validado com `node --check` e QA no navegador (HTTP + `file://`) com 0 erros de console.
 
+---
+
+# 15/09/2026 — 13 melhorias: relatório com datas, plano de implementação, backup automático, IndexedDB dos Primeiros Socorros e e-mail SMTP
+
+> Sessão longa. O usuário (1) pediu para corrigir o relatório por período (mostrar a data completa e reduzir a fonte), (2) pediu ideias de melhoria (que foram salvas em `Idéias-Melhorias.md`), (3) aprovou uma lista de melhorias e pediu um **plano em etapas** num arquivo, executando **etapa por etapa** e registrando cada etapa concluída, e (4) pediu dois ajustes finais (incluir visitantes no relatório da pessoa e corrigir o corte do dropdown da busca global).
+
+## Contexto
+
+- Objetivo geral: evoluir o sistema de portaria da Clarity Glass (raiz/Electron + `versao-web/`) com uma lista de melhorias aprovada pelo usuário.
+- Regra do usuário: criar um arquivo de **plano de etapas** e, a cada etapa concluída, salvar nesse arquivo que a etapa foi feita. Nada deveria ser criado sem o "ok" inicial (o "ok" foi dado para a lista escolhida).
+- Melhorias aprovadas (13 etapas): logo real no PDF; alertas no Dashboard; restauração seletiva de backup; backup automático (Finalizar Turno + 06h/18h); configurar e-mail pela tela; Ocorrências com gravidade e fotos; escolher seções no relatório por período; filtros extras (porteiro/tipo); relatório individual por pessoa; busca global no topo; acessibilidade + modo quiosque/tela cheia; unificar Primeiros Socorros no IndexedDB; envio direto de e-mail (SMTP).
+- Antes do plano, o usuário também pediu: no **Relatório por Período**, mostrar a **data completa** de cada registro (hoje só a hora) e **diminuir a fonte** para evitar quebras de linha.
+
+## Alterações Realizadas
+
+### 0) Correção do relatório por período (datas + fonte) — antes do plano
+
+- `services/pdfService.js` e `versao-web/js/portaria-services-web.js`:
+  - Adicionada a coluna **Data** em todas as seções que só mostravam hora: Chaves, EPIs, Primeiros Socorros, Visitantes, Avisos, Autorizações (Ocorrências ganhou Data junto da Gravidade depois; Entrada e Saída já tinha).
+  - Fonte das tabelas reduzida de **7.5 → 6.5** e padding das células de **2 → 1.5**.
+  - Novo helper `localDateOf(iso)` (data local de um timestamp) para os Primeiros Socorros.
+- Validado com `node --check` (pdfService como `.mjs`) e teste de stub capturando as colunas.
+
+### 1) `Idéias-Melhorias.md` (novo arquivo na raiz)
+
+- Criado com as ideias agrupadas (ganhos rápidos, funcionalidades de portaria, relatórios, dados/confiabilidade, multi-usuário, técnico/distribuição) + ordem recomendada.
+- Depois foi acrescentada a seção detalhada **"Confirmação pelo WhatsApp (link de confirmação)"** (a pedido do usuário): como funcionaria, o que exige (servidor + banco compartilhado), tabela de alternativas (`wa.me`, link de confirmação, API oficial, libs não oficiais) e pontos de atenção (valor de prova, LGPD, opt-in).
+
+### 2) `Plano-Implementacao.md` (novo arquivo na raiz) e execução das 13 etapas
+
+> Todas as etapas foram aplicadas na raiz (Electron) e **espelhadas em `versao-web/`**, com `node --check` e QA no navegador (raiz + web). Cada etapa foi registrada no `Plano-Implementacao.md`.
+
+- **Etapa 1 — Logo real no PDF**: `drawHeader` (pdfService + bundle) passou a embutir `window.CLARITY_LOGO` (ou `localStorage.clarityLogo`) via `doc.addImage`, com `logoFormat()` e placeholder só como fallback.
+- **Etapa 2 — Alertas no Dashboard**: faixa `.alert-bar` no `index.html` com **chaves em uso**, **EPIs pendentes**, **pessoas no local** (última movimentação por pessoa) e **insumos críticos** (≤ 3). Estilos em `css/dashboard.css`; cálculo em `js/dashboard.js`.
+- **Etapa 3 — Restauração seletiva**: novo modal `#restoreModal` com checkboxes por módulo (contagem de registros). `confirmarRestauracao()` restaura só os marcados. `restaurarBackup()` reescrito.
+- **Etapa 4 — Backup automático**: criados `js/backup.js` (`window.PortariaBackup` com `build()`/`save()`) e `js/backup-auto.js` (agendador 06h/18h com "catch-up" e marca `localStorage.clarityBackupAuto`). `Finalizar Turno` chama `backupGeralSilencioso()`. Scripts incluídos nas **22 páginas** (raiz + web) após `alarme.js`.
+- **Etapa 5 — E-mail pela tela**: card "E-mail do Relatório" em `configuracoes/` (Para, CC, Assunto, Mensagem com `{data}`), salvo em `localStorage.clarityEmailConfig`; `configService.js` e `emailService.js` (e bundle) passaram a usar os valores salvos com fallback.
+- **Etapa 6 — Ocorrências (gravidade + fotos)**: select de **Gravidade** (Baixa/Média/Alta/Crítica) e **fotos** (múltiplas, redimensionadas para ~1000px JPEG) com pré-visualização/remoção; histórico com badge e ícone de câmera; modal com galeria; PDF e Excel com coluna Gravidade (Excel com contagem de Fotos).
+- **Etapa 7 — Seções do relatório por período**: modal ganhou **9 checkboxes** + "marcar/desmarcar todas"; callback `(start, end, sections)`; `reportService`/`pdfService` renderizam só as seções marcadas (diário continua com todas).
+- **Etapa 8 — Filtros (Porteiro + Tipo de pessoa)**: campos no modal de período; `collectModulesDataByPeriod(start, end, filters)` filtra por porteiro (visitantes, EPIs, avisos, ocorrências, entrada/saída) e por tipo (entrada/saída e autorizações); aplicado ao PDF e ao Excel.
+- **Etapa 9 — Relatório individual por pessoa**: `UI.buildPdf` passou a aceitar `sections` (texto ou tabela); botão **"Relatório da pessoa"** no modal de visualização do Cadastro de Pessoas gera PDF em paisagem com **Dados cadastrais + Movimentações + Autorizações**.
+- **Etapa 10 — Busca global no topo**: campo no header do Dashboard procurando em pessoas, visitantes, chaves, EPIs, ocorrências, avisos e entrada/saída; resultados agrupados por módulo com link (debounce 250 ms, botão limpar, fecha ao clicar fora).
+- **Etapa 11 — Acessibilidade + tela cheia**: botão **"Tela cheia"** no Dashboard (IPC `toggle-fullscreen`/`set-kiosk` no Electron; Fullscreen API no navegador); `aria-label` na busca global (o `base.css` já tinha `:focus-visible` e `prefers-reduced-motion`).
+- **Etapa 12 — Primeiros Socorros no IndexedDB**: IndexedDB `clarityPortaria` **v5** com a store `primeiros_socorros`; o módulo lê/grava o estado no IndexedDB com **migração automática** do `localStorage.firstAidSystem` (mantido como espelho); `reportService`, `dashboard` e `Backup Geral` passaram a ler do IndexedDB com fallback; a restauração seletiva grava na store e no espelho.
+- **Etapa 13 — E-mail SMTP**: criado `electron/emailSender.js` (cliente SMTP **sem dependências**: SSL/TLS direto, STARTTLS, AUTH LOGIN/PLAIN, anexo PDF); IPC `send-email` + `preload.sendEmail`; card "Servidor de E-mail (SMTP)" em `configuracoes/` (host, porta, TLS, usuário, senha, remetente) em `localStorage.claritySmtpConfig`; botão **"Enviar por e-mail"** no modal do Finalizar Turno.
+
+### 3) Ajustes finais (pós-plano)
+
+- **Etapa 9 — incluir visitantes no relatório da pessoa**: o relatório passou a ter a seção **"Visitas — Controle de Visitantes"**, casando as visitas por **nome normalizado e/ou documento**; a seção de movimentações virou "Movimentações — Entrada e Saída". Assim o relatório cobre os dois fluxos (visitantes e funcionários/prestadores).
+- **Etapa 10 — dropdown da busca cortado**: causa = `overflow: hidden` do `.header` (usado para recortar os círculos decorativos). Solução: dropdown com `position: fixed` e posição calculada em JS (`posicionarResultadosGlobais`) logo abaixo do campo, com reposicionamento em `resize`/`scroll`.
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `Idéias-Melhorias.md` | Backlog de ideias de melhoria (inclui a seção de confirmação pelo WhatsApp). |
+| `Plano-Implementacao.md` | Plano das 13 etapas + registro de cada etapa concluída. |
+| `js/backup.js` | Núcleo do Backup Geral (`window.PortariaBackup`). |
+| `js/backup-auto.js` | Agendador do backup automático (06h/18h). |
+| `electron/emailSender.js` | Cliente SMTP sem dependências externas. |
+
+### Arquivos modificados (principais)
+
+- `services/pdfService.js`, `services/reportService.js`, `services/configService.js`, `services/emailService.js`.
+- `versao-web/js/portaria-services-web.js` (bundle: logo, datas, gravidade, seções, filtros, Primeiros Socorros no IndexedDB).
+- `js/ui.js` (modal de relatório com seções/filtros; `buildPdf` com seções).
+- `js/db.js` (v5 + store `primeiros_socorros`).
+- `js/dashboard.js` (alertas, restauração seletiva, backup silencioso, busca global, tela cheia, enviar e-mail, leitura de Primeiros Socorros).
+- `css/base.css` (estilos das seções do relatório), `css/dashboard.css` (alertas, restauração, busca, dropdown fixo).
+- `index.html` (alertas, modal de restauração, busca global, botões Tela cheia e Enviar por e-mail).
+- `configuracoes/index.html`, `configuracoes/script.js`, `configuracoes/style.css` (e-mail + SMTP).
+- `controle-de-ocorrencias/index.html`, `script.js`, `style.css` (gravidade + fotos).
+- `controle-de-cadastros/index.html`, `script.js` (relatório da pessoa + visitas).
+- `controle-de-insumos-primeiros-socorros/script.js` (IndexedDB + migração).
+- `electron/main.js`, `electron/preload.js` (tela cheia/quiosque e `send-email`).
+- Todas as **22 páginas HTML** (raiz + web) receberam `js/backup.js` e `js/backup-auto.js` após `alarme.js`.
+- Espelhamento em `versao-web/` de todos os arquivos acima.
+
+## Comandos executados
+
+- `node --check` em todos os JS alterados (raiz + `versao-web`), e `services/*.js` verificados como `.mjs`.
+- QA no navegador com a skill **browser-automation** (servidor estático local na porta 8790), etapa por etapa, na raiz (HTTP) e na `versao-web` (HTTP e `file://`).
+- Testes de stub em Node: colunas do PDF, seções, filtros (DB simulado) e SMTP (socket mock).
+- Smoke test do Electron: `electron-x64\electron.exe .` (janela abriu e permaneceu viva após 7 s).
+- `final-check.js`: conferiu sincronia raiz↔web (0 diferenças), mojibake (só no `resumo.md`, que contém exemplos) e referências a CDN (só dentro do próprio jsPDF).
+
+## Decisões tomadas
+
+1. **SMTP sem dependências externas** (`electron/emailSender.js` com `net`/`tls`), para manter a distribuição auto-contida (as pastas `electron-*` funcionam sem `node_modules`).
+2. **IndexedDB como fonte principal + `localStorage` como espelho** nos Primeiros Socorros, para migrar sem quebrar leitores antigos.
+3. **Seções do relatório** aplicam-se ao PDF; os **filtros** (porteiro/tipo) aplicam-se ao PDF e ao Excel.
+4. **Tela cheia**: IPC nativo no Electron (permite modo quiosque) e Fullscreen API no navegador.
+5. **Relatório da pessoa**: movimentações de Entrada e Saída e visitas do Controle de Visitantes em **seções separadas** (casamento por nome normalizado/documento).
+6. **Backup automático**: 06h e 18h com "catch-up" (gera o horário perdido ao abrir) e marca por dia+horário em `localStorage`.
+
+## Tentativas que Não Funcionaram
+
+- **`Set-Content -Encoding UTF8` no PowerShell** para editar `controle-de-ocorrencias/script.js`: causou **mojibake** (exatamente o problema já documentado nas sessões anteriores). Solução: `git checkout --` no arquivo e refazer as edições com a ferramenta de edição (que preserva o UTF-8).
+- **Wrapper de `window.UI.buildPdf` via `addInitScript`** para capturar as seções no teste da Etapa 9: **falhou** porque `UI` é uma **constante lexical** (`const UI = ...`), não uma propriedade de `window`. Solução: capturar as tabelas via `window.jspdf.jsPDF.API.autoTable` (que é global) gravando no DOM.
+- **`node_modules` ausente**: o `electron.exe` do `node_modules` não existia; o smoke test foi feito com `electron-x64\electron.exe`.
+
+## Problemas Encontrados
+
+1. **Relatório por período sem a data** (só hora) — resolvido adicionando a coluna Data e reduzindo a fonte.
+2. **Mojibake** ao usar `Set-Content -Encoding UTF8` — arquivo restaurado do git e edições refeitas.
+3. **Dropdown da busca global cortado** pelo `overflow: hidden` do `.header` — resolvido com `position: fixed` + posicionamento em JS.
+4. **`page.evaluate` em isolated world** — globais de página (`DB`, `Portaria`, `UI`) não são acessíveis; QA feito por DOM/cliques e por patch de `jsPDF.API.autoTable`.
+5. **Primeiros Socorros em `localStorage`** (separado dos demais) — unificado no IndexedDB com migração automática.
+
+## Solução Final
+
+- Sistema evoluído com as 13 melhorias aprovadas, todas espelhadas em `versao-web/`.
+- Relatórios com data completa em todas as seções e fonte reduzida.
+- Dashboard com indicadores, busca global (dropdown corrigido) e backup automático.
+- Ocorrências com gravidade e fotos; relatório por período configurável (seções e filtros) e relatório individual da pessoa (Entrada/Saída + Visitas).
+- Primeiros Socorros no IndexedDB (v5) com migração; e-mail direto por SMTP (sem Outlook).
+
+## Estado Atual do Projeto
+
+- IndexedDB `clarityPortaria` **v5** com stores: `chaves`, `visitantes`, `visitantes_perfil`, `epis`, `avisos`, `ocorrencias`, `pessoas`, `entradas_saidas`, `autorizacoes`, `config`, `primeiros_socorros`.
+- Novos arquivos: `Idéias-Melhorias.md`, `Plano-Implementacao.md`, `js/backup.js`, `js/backup-auto.js`, `electron/emailSender.js`.
+- `Plano-Implementacao.md` com **13/13 etapas ✅** e registro detalhado.
+- Verificação final: **0 arquivos espelhados divergentes** (raiz ↔ `versao-web`), `node --check` OK, app Electron inicia normalmente e QA no navegador sem erros de console.
+
+## Próximos Passos
+
+1. **Testar o envio SMTP de verdade**: preencher o servidor na tela Configurações e clicar em "Enviar por e-mail" (validado só com servidor simulado).
+2. **Conferir o backup automático** (06h/18h) no app real; lembrar que roda com o sistema aberto (com "catch-up" ao abrir).
+3. Revisar visualmente as fotos de Ocorrências, o modo tela cheia e o relatório da pessoa com dados reais.
+4. Se desejado: configurar o modo quiosque no app e/ou evoluir a confirmação por WhatsApp (link de confirmação) — depende de servidor + banco compartilhado.
+
+## Observações para Continuação
+
+- **Sincronização raiz ↔ `versao-web`**: sempre espelhar via `Copy-Item` (byte a byte) e ajustar a linha do services no `index.html` da versão web (`../js/portaria-services-web.js`, sem `type="module"`).
+- **Encoding**: **nunca** usar `Set-Content -Encoding UTF8`; usar a ferramenta de edição e/ou Node `fs` (utf8, sem BOM).
+- **Backup automático**: `js/backup.js` (núcleo) + `js/backup-auto.js` (agendador) carregados em todas as páginas; controle em `localStorage.clarityBackupAuto`.
+- **E-mail**: destinatários em `localStorage.clarityEmailConfig`; SMTP em `localStorage.claritySmtpConfig` (senha local); envio via IPC `send-email`.
+- **Primeiros Socorros**: store `primeiros_socorros` (registro `id:'state'`), com espelho em `localStorage.firstAidSystem` e migração automática.
+- **Relatório da pessoa**: movimentações por `pessoaId` (Entrada e Saída) + visitas por nome/documento (Controle de Visitantes).
+- **QA**: `page.evaluate` roda em isolated world (sem `DB`/`Portaria`/`UI`); usar DOM, cliques e patch de globais reais (`window.jspdf`).
+
+## Resumo Executivo
+
+- Corrigido o relatório por período: **data completa** em todas as seções e **fonte reduzida** (6.5) para evitar quebras.
+- Criados `Idéias-Melhorias.md` (com a ideia de confirmação por WhatsApp) e `Plano-Implementacao.md` (13 etapas, todas ✅).
+- Implementadas as 13 melhorias: logo no PDF, alertas no Dashboard, restauração seletiva, backup automático (turno + 06h/18h), e-mail pela tela, Ocorrências com gravidade/fotos, seções e filtros no relatório, relatório da pessoa, busca global, tela cheia, Primeiros Socorros no IndexedDB e envio SMTP.
+- Ajustes finais: relatório da pessoa agora inclui as **visitas do Controle de Visitantes**; dropdown da busca global não é mais cortado.
+- IndexedDB na **v5**; SMTP implementado sem dependências externas; tudo espelhado na `versao-web`.
+- Validado com `node --check`, QA no navegador (raiz + web) e smoke test do Electron; 0 diferenças de sincronia.
+- Pendente de teste real: envio SMTP com servidor válido e o backup automático no app.
+
 
 
 

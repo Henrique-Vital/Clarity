@@ -22,5 +22,18 @@ contextBridge.exposeInMainWorld('portariaAPI', {
    * @param {{to: string[], cc: string[], subject: string, body: string, fileName: string, base64: string}} payload
    * @returns {Promise<{ok: boolean, pdfPath?: string}>}
    */
-  sendOutlook: (payload) => ipcRenderer.invoke('send-outlook', payload)
+  sendOutlook: (payload) => ipcRenderer.invoke('send-outlook', payload),
+
+  /**
+   * Envia o relatório por e-mail direto (SMTP), sem Outlook.
+   * @param {{smtp: Object, to: string[], cc: string[], subject: string, body: string, fileName: string, base64: string}} payload
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  sendEmail: (payload) => ipcRenderer.invoke('send-email', payload),
+
+  /** Alterna a tela cheia. @returns {Promise<{ok: boolean, fullscreen: boolean}>} */
+  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
+
+  /** Liga/desliga o modo quiosque. @returns {Promise<{ok: boolean, kiosk: boolean}>} */
+  setKiosk: (enabled) => ipcRenderer.invoke('set-kiosk', enabled)
 });

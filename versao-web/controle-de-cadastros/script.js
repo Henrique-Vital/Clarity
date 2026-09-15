@@ -337,6 +337,114 @@ function closeViewModal() {
   UI.closeModal('viewModal');
 }
 
+// ===== RELATÓRIO INDIVIDUAL DA PESSOA =====
+async function gerarRelatorioPessoa() {
+  const id = lastSelectedId || editingId;
+  if (!id) return UI.showToast('Selecione uma pessoa para gerar o relatório.', 'warning');
+  const r = records.find((rec) => rec.id === id);
+  if (!r) return UI.showToast('Registro não encontrado.', 'error');
+
+  try {
+    const [movs, auts, visitasAll] = await Promise.all([
+      DB.store('entradas_saidas').getAll(),
+      DB.store('autorizacoes').getAll(),
+      DB.store('visitantes').getAll()
+    ]);
+
+    const movimentos = movs
+      .filter((m) => m.pessoaId === id)
+      .sort((a, b) => (String(b.data || '') + String(b.horaEntrada || '')).localeCompare(String(a.data || '') + String(a.horaEntrada || '')));
+    const autorizacoes = auts
+      .filter((a) => a.pessoaId === id || a.responsavelId === id)
+      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+
+    // Visitas do Controle de Visitantes: casa por nome e/ou documento.
+    const nomeP = Portaria.norm(r.nome || '');
+    const docP = Portaria.norm(r.documento || '');
+    const visitas = visitasAll
+      .filter((v) => {
+        const mesmoNome = nomeP && Portaria.norm(v.nome || '') === nomeP;
+        const mesmoDoc = docP && Portaria.norm(v.cpfRg || '') === docP;
+        return mesmoNome || mesmoDoc;
+      })
+      .sort((a, b) => (String(b.data || '') + String(b.horaEntrada || '')).localeCompare(String(a.data || '') + String(a.horaEntrada || '')));
+
+    const dadosText = [
+      `Nome: ${r.nome || '-'}`,
+      `Tipo: ${Portaria.tipoLabel(r.tipo)}`,
+      `CPF/RG: ${r.documento || 'Não informado'}`,
+      `Empresa: ${r.empresa || '-'}`,
+      `Unidade/Setor: ${r.unidade || r.setor || '-'}`,
+      `Matrícula: ${r.matricula || '-'}`,
+      `Cargo: ${r.cargo || '-'}`,
+      `Tipo de serviço: ${r.tipoServico || '-'}`,
+      `Telefone: ${r.telefone || 'Não informado'}`,
+      `E-mail: ${r.email || 'Não informado'}`,
+      `Situação: ${r.ativo === false ? 'Inativo' : 'Ativo'}`,
+      `Observações: ${r.observacoes || '-'}`
+    ];
+
+    const movRows = movimentos.map((m) => [
+      UI.formatDate(m.data),
+      m.horaEntrada || '-',
+      (m.horaSaida || m.saidaHora) ? `${UI.formatDate(m.saidaData || m.data)} ${m.horaSaida || m.saidaHora}` : '-',
+      m.porteiro || '-',
+      m.responsavel || '-',
+      m.status === 'fora' ? 'Fora' : 'Dentro'
+    ]);
+
+    const autRows = autorizacoes.map((a) => [
+      UI.formatDate(a.data || a.dataInicial),
+      a.responsavelNome || '-',
+      a.pessoaTipo || '-',
+      `${UI.formatDate(a.dataInicial)} ${a.horaInicial || ''} a ${UI.formatDate(a.dataFinal)} ${a.horaFinal || ''}`,
+      a.forma || '-',
+      a.status === 'cancelada' ? 'Cancelada' : 'Ativa'
+    ]);
+
+    const visitaRows = visitas.map((v) => [
+      UI.formatDate(v.data),
+      v.horaEntrada || '-',
+      (v.horaSaida || v.saidaHora) ? `${UI.formatDate(v.saidaData || v.data)} ${v.horaSaida || v.saidaHora}` : '-',
+      v.empresa || '-',
+      v.responsavel || '-',
+      v.setor || '-',
+      v.motivo || '-'
+    ]);
+
+    const nomeArq = String(r.nome || 'pessoa').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w]+/g, '_').toLowerCase();
+
+    UI.buildPdf({
+      title: 'RELATÓRIO DA PESSOA',
+      subtitle: r.nome || '',
+      period: `Gerado em ${UI.formatDate(UI.todayISO())}`,
+      orientation: 'l',
+      filename: `relatorio_pessoa_${nomeArq}_${UI.todayISO()}.pdf`,
+      sections: [
+        { heading: 'Dados cadastrais', text: dadosText },
+        {
+          heading: `Movimentações — Entrada e Saída (${movRows.length})`,
+          columns: ['Data', 'Entrada', 'Saída', 'Porteiro', 'Responsável', 'Situação'],
+          rows: movRows.length ? movRows : [['-', '-', '-', '-', '-', 'Sem movimentações']]
+        },
+        {
+          heading: `Visitas — Controle de Visitantes (${visitaRows.length})`,
+          columns: ['Data', 'Entrada', 'Saída', 'Empresa', 'Responsável', 'Setor', 'Motivo'],
+          rows: visitaRows.length ? visitaRows : [['-', '-', '-', '-', '-', '-', 'Sem visitas registradas']]
+        },
+        {
+          heading: `Autorizações (${autRows.length})`,
+          columns: ['Data', 'Responsável', 'Tipo', 'Período', 'Forma', 'Status'],
+          rows: autRows.length ? autRows : [['-', '-', '-', '-', '-', 'Sem autorizações']]
+        }
+      ]
+    });
+  } catch (e) {
+    console.error(e);
+    UI.showToast('Erro ao gerar o relatório da pessoa.', 'error');
+  }
+}
+
 // ===== HISTÓRICO =====
 function getFiltered() {
   const busca = Portaria.norm($('#filterBusca').value);

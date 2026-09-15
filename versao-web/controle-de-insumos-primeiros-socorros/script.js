@@ -36,8 +36,8 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 // ===== INIT =====
-document.addEventListener('DOMContentLoaded', () => {
-  loadState();
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadState();
   applyLogo();
   applyTheme();
   updateDateTime();
@@ -72,38 +72,77 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ===== LOCAL STORAGE =====
-function loadState() {
-  try {
-    const saved = localStorage.getItem('firstAidSystem');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      state.inventory = parsed.inventory || JSON.parse(JSON.stringify(DEFAULT_INVENTORY));
-      state.occurrences = parsed.occurrences || [];
-      state.currentOccurrenceId = parsed.currentOccurrenceId || null;
-      state.currentNumber = parsed.currentNumber || 1;
-      state.theme = parsed.theme || 'light';
-      state.logo = parsed.logo || null;
+// ===== PERSISTÊNCIA (IndexedDB, com migração do localStorage) =====
+const FIRST_AID_STORE = 'primeiros_socorros';
+const FIRST_AID_KEY = 'state';
 
-      // Restore form
-      if (state.currentOccurrenceId) {
-        const occ = findOccurrence(state.currentOccurrenceId);
-        if (occ) populateForm(occ);
-      }
-    } else {
-      resetToDefault();
+/** Aplica um objeto de estado salvo ao estado em memória. */
+function applySavedState(parsed) {
+  state.inventory = parsed.inventory || JSON.parse(JSON.stringify(DEFAULT_INVENTORY));
+  state.occurrences = parsed.occurrences || [];
+  state.currentOccurrenceId = parsed.currentOccurrenceId || null;
+  state.currentNumber = parsed.currentNumber || 1;
+  state.theme = parsed.theme || 'light';
+  state.logo = parsed.logo || null;
+  if (state.currentOccurrenceId) {
+    const occ = findOccurrence(state.currentOccurrenceId);
+    if (occ) populateForm(occ);
+  }
+}
+
+/** Lê o estado do IndexedDB; se não existir, migra do localStorage. */
+async function loadState() {
+  let parsed = null;
+
+  // 1) IndexedDB (fonte principal).
+  try {
+    if (typeof DB !== 'undefined' && DB.store) {
+      parsed = await DB.store(FIRST_AID_STORE).get(FIRST_AID_KEY);
     }
   } catch (e) {
-    console.warn('Erro ao carregar estado:', e);
+    console.warn('Erro ao ler primeiros socorros do IndexedDB:', e);
+  }
+
+  // 2) Migração: dados antigos no localStorage.
+  if (!parsed) {
+    try {
+      const saved = localStorage.getItem('firstAidSystem');
+      if (saved) {
+        parsed = JSON.parse(saved);
+        console.info('Primeiros socorros: migrando dados do localStorage para o IndexedDB.');
+      }
+    } catch (e) {
+      console.warn('Erro ao ler estado do localStorage:', e);
+    }
+  }
+
+  if (parsed) {
+    applySavedState(parsed);
+  } else {
     resetToDefault();
   }
-  // Ensure inventory is valid
+
+  // Garante inventário válido.
   if (!state.inventory || state.inventory.length === 0) {
     resetToDefault();
   }
 
-  // Migrate old Band Aid items
+  // Grava no IndexedDB (migração/atualização) e mantém o espelho legado.
+  persistState();
+
+  // Migra itens antigos de Band Aid.
   migrateBandAid();
+}
+
+/** Grava o estado no IndexedDB (assíncrono). */
+async function persistState() {
+  try {
+    if (typeof DB !== 'undefined' && DB.store) {
+      await DB.store(FIRST_AID_STORE).put(Object.assign({ id: FIRST_AID_KEY }, state));
+    }
+  } catch (e) {
+    console.warn('Erro ao salvar primeiros socorros no IndexedDB:', e);
+  }
 }
 
 function resetToDefault() {
@@ -131,6 +170,9 @@ function migrateBandAid() {
 }
 
 function saveState() {
+  // IndexedDB é a fonte principal; o localStorage é mantido apenas como
+  // espelho de compatibilidade (leituras antigas/backup).
+  persistState();
   try {
     localStorage.setItem('firstAidSystem', JSON.stringify(state));
     showAutoSaveIndicator(true);

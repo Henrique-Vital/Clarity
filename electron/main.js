@@ -19,6 +19,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
+const { sendMail } = require('./emailSender');
 
 const ROOT_DIR = path.join(__dirname, '..');
 
@@ -196,6 +197,41 @@ ipcMain.handle('send-outlook', async (event, payload) => {
       }
     });
   });
+});
+
+/**
+ * Envia o relatório por e-mail direto via SMTP (sem Outlook).
+ * @param {Object} payload - { smtp: {host,port,secure,user,pass,from}, to, cc, subject, body, fileName, base64 }
+ */
+ipcMain.handle('send-email', async (event, payload) => {
+  const { smtp, to, cc, subject, body, fileName, base64 } = payload || {};
+  try {
+    await sendMail(smtp || {}, {
+      to,
+      cc,
+      subject,
+      body,
+      attachment: { name: fileName || 'relatorio.pdf', mime: 'application/pdf', base64 }
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || 'Falha ao enviar o e-mail.' };
+  }
+});
+
+/** Alterna o modo tela cheia da janela do aplicativo. */
+ipcMain.handle('toggle-fullscreen', async () => {
+  if (!mainWindow) return { ok: false, fullscreen: false };
+  const next = !mainWindow.isFullScreen();
+  mainWindow.setFullScreen(next);
+  return { ok: true, fullscreen: next };
+});
+
+/** Liga/desliga o modo quiosque (tela cheia travada, sem sair com Esc). */
+ipcMain.handle('set-kiosk', async (event, enabled) => {
+  if (!mainWindow) return { ok: false, kiosk: false };
+  mainWindow.setKiosk(!!enabled);
+  return { ok: true, kiosk: mainWindow.isKiosk() };
 });
 
 let mainWindow = null;
