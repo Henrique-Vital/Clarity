@@ -18,7 +18,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   UI.initCommon();
   await loadConfig();
   loadEmailConfig();
+  renderAutoBackupStatus();
 });
+
+/* ===== BACKUP AUTOMÁTICO ===== */
+function renderAutoBackupStatus() {
+  const el = document.getElementById('autoBackupStatus');
+  if (!el) return;
+  let status = null;
+  try {
+    status = JSON.parse(localStorage.getItem('clarityBackupAutoStatus') || 'null');
+  } catch (e) {
+    status = null;
+  }
+  if (!status || !status.at) {
+    el.textContent = 'Nenhuma tentativa registrada.';
+    return;
+  }
+
+  const when = new Date(status.at).toLocaleString('pt-BR');
+  if (status.ok) {
+    el.textContent = `Último backup automático: ${when} — ${status.totalRegistros || 0} registro(s), arquivo ${status.fileName || '—'}.`;
+    return;
+  }
+
+  const reasons = {
+    'banco-sem-dados': 'não há registros neste navegador. Verifique se está usando o mesmo endereço e o mesmo navegador dos lançamentos.',
+    'pasta-nao-autorizada': 'a pasta de destino ainda não foi autorizada. Use o botão abaixo.',
+    'falha-ao-salvar': 'não foi possível salvar o arquivo.',
+    'sem-resultado': 'o módulo de backup não respondeu.',
+    'erro': 'ocorreu um erro inesperado.'
+  };
+  el.textContent = `Última tentativa: ${when} — ${reasons[status.motivo] || 'backup não realizado.'}`;
+}
+
+async function autorizarPastaBackup() {
+  const FileService = window.PortariaServices && window.PortariaServices.FileService;
+  if (!FileService || typeof FileService.ensureFolder !== 'function') {
+    UI.showToast('Serviço de arquivos não carregado. Recarregue a página.', 'error');
+    return;
+  }
+  try {
+    const res = await FileService.ensureFolder();
+    UI.showToast(`Pasta "${res.folderName}" autorizada para os backups.`, 'success');
+  } catch (e) {
+    console.warn('Falha ao autorizar a pasta de backup:', e);
+    UI.showToast('Não foi possível autorizar a pasta. Tente novamente e escolha a Área de Trabalho.', 'error');
+  }
+}
 
 async function loadConfig() {
   const cfg = await Portaria.getConfig();

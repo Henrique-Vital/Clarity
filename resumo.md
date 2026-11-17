@@ -21,8 +21,11 @@ Características principais:
 - Os dados são locais ao navegador do dispositivo; não há sincronização entre
   computadores diferentes.
 - Backup e restauração em JSON, com opção de restauração seletiva por módulo.
+- Backup automático às 06:00/18:00, com proteção contra arquivo vazio e
+  diagnóstico da última tentativa.
 - Relatórios em PDF e exportações em Excel.
 - Publicação estática na Vercel com HTTPS.
+- Módulos podem ser abertos em abas/janelas separadas, mantendo o Dashboard.
 
 ## 2. Estado atual
 
@@ -117,8 +120,13 @@ As bibliotecas de PDF, Excel e ícones são locais; não há dependência de CDN
 - **Backup Geral**: JSON com todos os módulos e preferências.
 - **Restauração seletiva**: escolha dos módulos a restaurar.
 - **Backup automático**: ao Finalizar Turno e às 06:00/18:00, com “catch-up” ao
-  abrir o sistema após o horário.
-- **Tema claro/escuro**, troca de logo e **tela cheia**.
+  abrir o sistema após o horário. Só grava quando há registros e a pasta está
+  autorizada; usa lock entre abas para não duplicar a rotina. O resultado da
+  última tentativa aparece em **Configurações → Backup Automático**.
+- **Tema claro/escuro**, troca de logo, **tela cheia** e opção de **abrir
+  módulos em nova aba/janela**.
+- **Diagnóstico do backup**: o JSON inclui `origem`, `url`, `contagens` e
+  `totalRegistros`, facilitando identificar dados de outro endereço/navegador.
 
 ## 6. Dados
 
@@ -134,6 +142,10 @@ Preferências e configurações no `localStorage`:
 - `clarityPorteiro`: nome do porteiro memorizado.
 - `clarityEmailConfig`: destinatários, CC, assunto e mensagem do e-mail.
 - `clarityBackupAuto`: controle dos backups automáticos já feitos.
+- `clarityBackupAutoStatus`: resultado da última tentativa automática
+  (sucesso, banco vazio, pasta não autorizada, erro).
+- `clarityOpenModulesNewWindow`: preferência para abrir os módulos em nova
+  aba/janela.
 - `clarity_alarme_disparados`: controle de alarmes de avisos.
 - `firstAidSystem`: espelho legado de Primeiros Socorros (o IndexedDB é a fonte
   principal).
@@ -145,7 +157,7 @@ logo. A restauração pode substituir todos os módulos ou apenas os selecionado
 
 - `manifest.webmanifest`: nome, ícones (192/512, maskable), cores, `start_url` e
   atalhos para Chaves, Visitantes, Entrada/Saída e Ocorrências.
-- `sw.js`: cache `portaria-clarity-web-v1.1.0` com 59 entradas.
+- `sw.js`: cache `portaria-clarity-web-v1.2.0` com 59 entradas.
   - Instalação: a versão nova **não** assume o controle imediatamente.
   - Ativação: remove caches antigos e chama `clients.claim()`.
   - Navegação: rede primeiro, com fallback para o cache (incluindo rotas com
@@ -209,6 +221,9 @@ ao abrir o `index.html` diretamente via `file://`.
   no IndexedDB).
 - **17/11/2026**: consolidação como aplicação web/PWA, publicação estática na
   Vercel e atualização com banner no próprio app.
+- **17/11/2026**: correção do backup automático sem dados (só grava com registros
+  e pasta autorizada), status em Configurações, diagnóstico no JSON, lock entre
+  abas e abertura de módulos em nova aba/janela.
 
 ## 11. Próximos passos
 

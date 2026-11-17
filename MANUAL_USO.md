@@ -62,6 +62,8 @@ Quando o sistema abre, você vê:
 
 **Para abrir um módulo:** clique no card desejado. Para voltar à tela inicial, clique em **Voltar ao Dashboard** no topo de qualquer módulo.
 
+**Usar vários módulos ao mesmo tempo:** acima dos cards, clique em **Abrir módulos em nova janela**. A partir daí, cada módulo abre em outra aba/janela e o Dashboard continua aberto. A preferência fica salva neste navegador. No aplicativo instalado (PWA), essa é a forma de manter, por exemplo, Chaves e EPIs abertos juntos. As abas compartilham os mesmos dados; se alterar algo em uma, recarregue a outra para ver a atualização.
+
 ---
 
 ## 4. Controle de Chaves ou Item
@@ -251,7 +253,8 @@ Ajusta como o sistema se comporta.
    - **Condomínio** → rótulos "Morador / Unidade".
    - **Empresa** → rótulos "Funcionário / Setor".
 2. **Quem pode autorizar:** marque quais perfis (Moradores, Funcionários, Visitantes, Prestadores) podem ser "responsável" numa autorização. **Pelo menos um** deve estar marcado.
-3. Clique em **Salvar Configurações**.
+3. **Backup Automático:** mostra o resultado da última tentativa automática. Use **Autorizar pasta de backup** para permitir que o sistema grave os arquivos automáticos na pasta `controle-da-portaria` da Área de Trabalho.
+4. Clique em **Salvar Configurações**.
 
 ---
 
@@ -280,8 +283,14 @@ Proteja seus dados fazendo backups regulares.
 
 **Criar um backup (Backup Geral):**
 1. Na tela inicial, clique em **Backup Geral**.
-2. O sistema gera o arquivo `backup_geral_AAAA-MM-DD.json` com **todos os dados** de todos os módulos.
-3. O arquivo é baixado pelo navegador (ou salvo na pasta escolhida, quando o navegador permite).
+2. O sistema gera o arquivo `backup_geral_AAAA-MM-DD_HHhMM.json` com **todos os dados** de todos os módulos.
+3. O arquivo é salvo na pasta escolhida ou baixado pelo navegador, conforme a permissão disponível. O aviso na tela informa quantos registros foram incluídos.
+
+**Backup automático:**
+- O sistema tenta gerar o Backup Geral todos os dias às **06:00** e às **18:00**, e também ao **Finalizar Turno**.
+- O backup automático só é gravado quando existem registros no banco **e** a pasta de destino está autorizada. Se o banco estiver vazio, nenhum arquivo é criado e o horário fica pendente para uma próxima tentativa.
+- Para autorizar a pasta, abra **Configurações → Backup Automático → Autorizar pasta de backup**. O resultado da última tentativa (feita, vazia ou pasta não autorizada) aparece nessa mesma tela.
+- O backup automático não abre janelas de confirmação e não faz download silencioso: ele grava direto na pasta. Mantenha o sistema aberto no horário para que a rotina rode.
 
 **Restaurar um backup:**
 1. Na tela inicial, clique em **Restaurar Backup**.
@@ -322,6 +331,9 @@ Não. Os dados ficam salvos automaticamente no banco do navegador do sistema.
 
 **Perdi um dado importante. E agora?**
 Se você tem um backup (Backup Geral), use **Restaurar Backup**. A partir daí, o ideal é criar backups regularmente.
+
+**Posso abrir mais de um módulo ao mesmo tempo?**
+Sim. No Dashboard, ative **Abrir módulos em nova janela**. No aplicativo instalado (PWA), cada módulo abre em outra janela; no navegador, abre em outra aba. Os dados são os mesmos, mas uma aba não atualiza sozinha quando outra altera algo — recarregue se precisar.
 
 **Posso usar em vários computadores ao mesmo tempo?**
 Cada computador guarda os próprios dados. Para usar em outro computador, faça um **Backup Geral** e **Restaure** no outro.

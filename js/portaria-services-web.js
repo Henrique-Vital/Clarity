@@ -278,7 +278,35 @@
       const writable = await fileHandle.createWritable();
       await writable.write(blob);
       await writable.close();
-      return { ok: true, savedToDesktop: true, folderName, fileName };
+
+      // Proteção contra arquivo de 0 byte: confirma o tamanho e remove
+      // o resíduo vazio antes de deixar o fluxo cair no download.
+      let size = null;
+      try {
+        const savedFile = await fileHandle.getFile();
+        size = savedFile.size;
+      } catch (e) {
+        // getFile pode não existir em alguns navegadores; segue normalmente
+      }
+      if (size === 0) {
+        try { await dir.removeEntry(fileName); } catch (e) { /* ignora */ }
+        throw new Error('O arquivo salvo ficou vazio.');
+      }
+      return { ok: true, savedToDesktop: true, folderName, fileName, size };
+    },
+
+    // Solicita/valida a pasta raiz e cria a subpasta de saída sem gravar
+    // arquivo. Usado pelo botão "Autorizar pasta de backup".
+    async ensureFolder() {
+      const folderName = ConfigService.getPastaRelatorios();
+      const root = await getDesktopRootHandle();
+      let dir = null;
+      try {
+        dir = await root.getDirectoryHandle(folderName, { create: false });
+      } catch (e) {
+        dir = await root.getDirectoryHandle(folderName, { create: true });
+      }
+      return { ok: true, folderName, authorized: !!dir };
     },
 
     async savePdf(blob, fileName) {

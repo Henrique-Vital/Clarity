@@ -123,15 +123,22 @@ páginas.
    preferências; `save()` grava o arquivo.
 2. `js/backup-auto.js` verifica os horários a cada minuto, faz “catch-up” ao abrir
    o sistema e controla os backups já feitos em `localStorage.clarityBackupAuto`.
-3. A gravação tenta usar a pasta autorizada via File System Access API; se não
-   houver permissão ou o usuário cancelar, o arquivo é baixado pelo navegador.
-4. O finalizar turno também chama o backup silencioso.
+3. O backup automático grava direto na pasta autorizada via File System Access
+   API, sem download silencioso. Se a pasta não estiver autorizada, o slot fica
+   pendente e o motivo aparece em **Configurações → Backup Automático**.
+4. A rotina ignora banco vazio (`requireData`) e usa lock entre abas
+   (`navigator.locks`/`localStorage`) para não duplicar o arquivo.
+5. O JSON inclui `origem`, `url`, `contagens` e `totalRegistros` para diagnosticar
+   dados de outro endereço/navegador.
+6. O finalizar turno também chama o backup silencioso, mas não cria arquivo vazio.
 
 **Critério de conclusão:** backup JSON gerado automaticamente nos horários, sem
-janela de confirmação. ✅
+janela de confirmação e sem arquivo vazio. ✅
 
 **Limitação conhecida:** o agendamento só ocorre com o sistema aberto; ao reabrir,
-o “catch-up” gera o backup do horário perdido.
+o “catch-up” gera o backup do horário perdido. A gravação automática depende de a
+pasta estar autorizada; se o navegador exigir um gesto do usuário, use o botão de
+autorização em Configurações.
 
 ---
 

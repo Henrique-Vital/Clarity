@@ -53,6 +53,61 @@ function renderPreviewModal(result) {
   UI.openModal(DASHBOARD_MODAL_ID);
 }
 
+// ===== ABRIR MÓDULOS EM NOVA JANELA =====
+function initPortalNewWindow() {
+  const KEY = 'clarityOpenModulesNewWindow';
+  const btn = document.getElementById('portalNewWindowBtn');
+  const cards = document.querySelectorAll('.portal-card');
+  if (!cards.length) return;
+
+  let enabled = false;
+  try {
+    enabled = localStorage.getItem(KEY) === '1';
+  } catch (e) {
+    enabled = false;
+  }
+
+  const apply = (value) => {
+    cards.forEach((card) => {
+      if (value) {
+        card.target = '_blank';
+        card.rel = 'noopener';
+      } else {
+        card.removeAttribute('target');
+        card.removeAttribute('rel');
+      }
+    });
+    if (btn) {
+      btn.classList.toggle('active', value);
+      btn.setAttribute('aria-pressed', value ? 'true' : 'false');
+      btn.innerHTML = value
+        ? '<i class="fas fa-window-restore"></i> Módulos abrem em nova janela'
+        : '<i class="fas fa-window-restore"></i> Abrir módulos em nova janela';
+      btn.title = value
+        ? 'Desativar abertura dos módulos em nova janela'
+        : 'Abrir cada módulo em uma nova janela, mantendo este painel aberto';
+    }
+  };
+
+  apply(enabled);
+  if (btn) {
+    btn.addEventListener('click', () => {
+      enabled = !enabled;
+      try {
+        localStorage.setItem(KEY, enabled ? '1' : '0');
+      } catch (e) {
+        // sem persistência: vale só para esta sessão
+      }
+      apply(enabled);
+      if (window.UI && UI.showToast) {
+        UI.showToast(enabled
+          ? 'Os módulos agora abrem em uma nova janela/aba.'
+          : 'Os módulos voltaram a abrir na mesma janela.', 'info');
+      }
+    });
+  }
+}
+
 // ===== BACKUP GERAL =====
 async function backupGeral() {
   if (!window.PortariaBackup) {
@@ -61,9 +116,27 @@ async function backupGeral() {
   }
   UI.showToast('Gerando backup geral...', 'info');
   try {
-    const res = await window.PortariaBackup.save();
-    const pasta = (res && res.res && res.res.folderName) ? res.res.folderName : 'controle-da-portaria';
-    UI.showToast('Backup geral salvo com sucesso na pasta "' + pasta + '".', 'success');
+    const res = await window.PortariaBackup.save({ requireData: true });
+    if (res && res.empty) {
+      UI.showToast('Nenhum registro encontrado neste navegador. Verifique se está usando o mesmo endereço e navegador dos lançamentos.', 'warning');
+      return;
+    }
+    if (!res || !res.ok) {
+      UI.showToast('Não foi possível gerar o backup geral.', 'error');
+      return;
+    }
+    if (res.totalRegistros === 0) {
+      UI.showToast('Backup gerado, mas não há registros neste navegador. Verifique se está usando o mesmo endereço e navegador dos lançamentos.', 'warning');
+      return;
+    }
+    const pasta = (res.res && res.res.folderName) ? res.res.folderName : 'controle-da-portaria';
+    if (res.savedToFolder) {
+      UI.showToast('Backup geral salvo na pasta "' + pasta + '" (' + res.totalRegistros + ' registros).', 'success');
+    } else if (res.downloaded) {
+      UI.showToast('Backup geral baixado (' + res.totalRegistros + ' registros).', 'success');
+    } else {
+      UI.showToast('Backup gerado, mas não foi possível confirmar o salvamento.', 'warning');
+    }
   } catch (e) {
     console.error('Erro ao gerar backup geral:', e);
     UI.showToast('Erro ao gerar o backup geral.', 'error');
@@ -74,7 +147,10 @@ async function backupGeral() {
 async function backupGeralSilencioso() {
   if (!window.PortariaBackup) return;
   try {
-    await window.PortariaBackup.save();
+    const res = await window.PortariaBackup.save({ requireData: true });
+    if (res && res.empty) {
+      console.info('Backup do turno ignorado: nenhum registro no banco.');
+    }
   } catch (e) {
     console.warn('Falha no backup automático do turno:', e);
   }
@@ -463,6 +539,7 @@ function limparBuscaGlobal() {
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
   UI.initCommon();
+  initPortalNewWindow();
 
   const $ = (sel) => document.querySelector(sel);
   const today = UI.todayISO();

@@ -189,6 +189,22 @@
       </p>
     </section>
 
+    <!-- ===== BACKUP AUTOMÁTICO ===== -->
+    <section class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-clock-rotate-left"></i> Backup Automático</h2>
+      </div>
+      <p class="cfg-hint">
+        O sistema tenta salvar um backup geral todos os dias às 06:00 e às 18:00.
+        O arquivo só é gerado quando há registros neste navegador e a pasta de
+        destino está autorizada.
+      </p>
+      <p class="cfg-hint" id="autoBackupStatus">Nenhuma tentativa registrada.</p>
+      <button type="button" class="btn btn-sm btn-outline" id="autorizarPastaBtn" onclick="autorizarPastaBackup()">
+        <i class="fas fa-folder-open"></i> Autorizar pasta de backup
+      </button>
+    </section>
+
     <div class="form-actions">
       <button class="btn btn-primary" onclick="salvarConfig()">
         <i class="fas fa-save"></i> Salvar Configurações
