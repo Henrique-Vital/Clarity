@@ -254,7 +254,8 @@ Ajusta como o sistema se comporta.
    - **Empresa** → rótulos "Funcionário / Setor".
 2. **Quem pode autorizar:** marque quais perfis (Moradores, Funcionários, Visitantes, Prestadores) podem ser "responsável" numa autorização. **Pelo menos um** deve estar marcado.
 3. **Backup Automático:** mostra o resultado da última tentativa automática. Use **Autorizar pasta de backup** para permitir que o sistema grave os arquivos automáticos na pasta `controle-da-portaria` da Área de Trabalho.
-4. Clique em **Salvar Configurações**.
+4. **Atualização do Sistema:** mostra a versão instalada. Use **Verificar atualização** para procurar uma versão nova e **Forçar atualização** para limpar o cache/service worker e recarregar. Os dados do banco local são preservados.
+5. Clique em **Salvar Configurações**.
 
 ---
 
@@ -324,7 +325,7 @@ Na pasta de Downloads do navegador (ou na pasta escolhida, quando o navegador pe
 Na primeira abertura, sim. Depois disso, o sistema fica disponível offline no mesmo navegador, e os dados são salvos localmente.
 
 **Como atualizar o sistema?**
-Quando houver uma versão nova, aparece o aviso **"Nova versão disponível"** com o botão **"Atualizar agora"**. Clique no botão: a página recarrega já na versão nova, sem precisar reinstalar o aplicativo.
+Quando houver uma versão nova, aparece o aviso **"Nova versão disponível"** com o botão **"Atualizar agora"**. Clique no botão: a página recarrega já na versão nova, sem precisar reinstalar o aplicativo. Se o aviso não aparecer, abra **Configurações → Atualização do Sistema** e clique em **Forçar atualização**. Isso limpa o cache e o service worker, mas **não apaga os dados**. Reinstalar o aplicativo ou limpar apenas os cookies não remove o cache antigo.
 
 **Os dados são perdidos se eu fechar o programa?**
 Não. Os dados ficam salvos automaticamente no banco do navegador do sistema.

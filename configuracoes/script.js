@@ -19,7 +19,52 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadConfig();
   loadEmailConfig();
   renderAutoBackupStatus();
+  initUpdateCard();
 });
+
+/* ===== ATUALIZAÇÃO ===== */
+function initUpdateCard() {
+  const el = document.getElementById('appVersion');
+  const origin = document.getElementById('appOrigin');
+  const api = window.PortariaPWA;
+  if (el) el.textContent = api && api.version ? api.version : '—';
+  if (origin) origin.textContent = window.location.origin;
+}
+
+function verificarAtualizacao() {
+  const api = window.PortariaPWA;
+  if (!api || typeof api.checkForUpdate !== 'function') {
+    UI.showToast('Verificação de atualização indisponível neste navegador.', 'warning');
+    return;
+  }
+  UI.showToast('Verificando atualização...', 'info');
+  api.checkForUpdate();
+  setTimeout(() => {
+    if (api.isUpdateAvailable && api.isUpdateAvailable()) {
+      UI.showToast('Nova versão encontrada. Clique em "Forçar atualização".', 'success');
+    } else {
+      UI.showToast('Nenhuma atualização pendente encontrada. Se necessário, use "Forçar atualização".', 'info');
+    }
+  }, 2500);
+}
+
+async function forcarAtualizacao() {
+  const api = window.PortariaPWA;
+  if (!api) {
+    UI.showToast('Atualização indisponível neste navegador.', 'warning');
+    return;
+  }
+  if (api.isUpdateAvailable && api.isUpdateAvailable() && typeof api.applyUpdate === 'function') {
+    api.applyUpdate();
+    return;
+  }
+  UI.showToast('Limpando cache e recarregando na versão mais recente...', 'info');
+  if (typeof api.forceUpdate === 'function') {
+    await api.forceUpdate();
+  } else {
+    window.location.reload();
+  }
+}
 
 /* ===== BACKUP AUTOMÁTICO ===== */
 function renderAutoBackupStatus() {

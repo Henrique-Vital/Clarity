@@ -41,8 +41,11 @@
 - Nunca usar `Set-Content -Encoding UTF8` (causa mojibake); usar as ferramentas de
   edição ou Node `fs` em UTF-8.
 - Validar JavaScript com `node --check`.
-- A cada publicação, incrementar `CACHE_NAME` em `sw.js` para disparar a
-  atualização do PWA.
+- A cada publicação, incrementar `CACHE_NAME` em `sw.js` e `APP_VERSION` em
+  `js/pwa.js` para disparar a atualização do PWA.
+- Se a Vercel foi configurada por upload manual, `git push` não publica. Conectar
+  o repositório em **Project → Settings → Git** ou refazer o deploy manual.
+- Conferir a versão publicada em `https://SEU-DOMINIO/sw.js` (`CACHE_NAME`).
 
 ---
 

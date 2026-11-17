@@ -157,7 +157,7 @@ logo. A restauração pode substituir todos os módulos ou apenas os selecionado
 
 - `manifest.webmanifest`: nome, ícones (192/512, maskable), cores, `start_url` e
   atalhos para Chaves, Visitantes, Entrada/Saída e Ocorrências.
-- `sw.js`: cache `portaria-clarity-web-v1.2.0` com 59 entradas.
+- `sw.js`: cache `portaria-clarity-web-v1.2.1` com 59 entradas.
   - Instalação: a versão nova **não** assume o controle imediatamente.
   - Ativação: remove caches antigos e chama `clients.claim()`.
   - Navegação: rede primeiro, com fallback para o cache (incluindo rotas com
@@ -171,12 +171,16 @@ logo. A restauração pode substituir todos os módulos ou apenas os selecionado
   - banner `#pwaUpdateBanner` com “Agora não” (dispensa pela sessão) e “Atualizar
     agora”;
   - o botão envia `SKIP_WAITING` ao service worker em espera e recarrega a página;
-  - expõe `window.PortariaPWA` com `canInstall`, `install`, `checkForUpdate`,
-    `applyUpdate` e `isUpdateAvailable`.
+  - **Forçar atualização** em Configurações remove service workers e caches
+    (preserva o IndexedDB) e recarrega com URL nova; útil quando o banner não
+    aparece;
+  - expõe `window.PortariaPWA` com `version`, `canInstall`, `install`,
+    `checkForUpdate`, `applyUpdate`, `forceUpdate` e `isUpdateAvailable`.
 
 **Regra de publicação:** a cada nova versão, incrementar `CACHE_NAME` em `sw.js`
-(ex.: `portaria-clarity-web-v1.1.1`). Sem esse incremento, o navegador pode
-continuar servindo o cache antigo e o banner de atualização não aparece.
+(ex.: `portaria-clarity-web-v1.2.2`) e `APP_VERSION` em `js/pwa.js`. Sem esse
+incremento, o navegador pode continuar servindo o cache antigo e o banner de
+atualização não aparece.
 
 PWA e service worker exigem **HTTPS** ou `localhost`/`127.0.0.1`; não funcionam
 ao abrir o `index.html` diretamente via `file://`.
@@ -185,6 +189,10 @@ ao abrir o `index.html` diretamente via `file://`.
 
 - A raiz do repositório é o site; não há build.
 - Na Vercel: importar o repositório, usar preset estático e publicar a raiz.
+- **Atenção:** se o projeto foi criado por upload manual (sem Git conectado),
+  `git push` não publica nada. Conecte o repositório em
+  **Vercel → Project → Settings → Git** ou faça um novo deploy manual.
+  Confirme em `https://SEU-DOMINIO/sw.js` se o `CACHE_NAME` publicado é o atual.
 - `vercel.json` define:
   - `/sw.js` sem cache (`no-cache, no-store`) e `Service-Worker-Allowed: /`;
   - `manifest.webmanifest` como `application/manifest+json; charset=utf-8`;
@@ -224,6 +232,8 @@ ao abrir o `index.html` diretamente via `file://`.
 - **17/11/2026**: correção do backup automático sem dados (só grava com registros
   e pasta autorizada), status em Configurações, diagnóstico no JSON, lock entre
   abas e abertura de módulos em nova aba/janela.
+- **17/11/2026**: botão **Forçar atualização** e versão do app em Configurações;
+  documentação sobre deploy via Git na Vercel.
 
 ## 11. Próximos passos
 

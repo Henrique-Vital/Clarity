@@ -102,6 +102,12 @@
 }
 
 /* ===== FORM ACTIONS ===== */
+.cfg-inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .form-actions {
   display: flex;
   justify-content: center;

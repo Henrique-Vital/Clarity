@@ -19,6 +19,7 @@
   if (!script) return;
 
   var base = new URL('../', script.src).href;
+  var APP_VERSION = '1.2.1';
   var UPDATE_INTERVAL = 30 * 60 * 1000;
   var FOCUS_INTERVAL = 5 * 60 * 1000;
   var RELOAD_FALLBACK = 5000;
@@ -52,10 +53,12 @@
   function pwaApi() {
     if (!window.PortariaPWA) {
       window.PortariaPWA = {
+        version: APP_VERSION,
         canInstall: false,
         install: function () { return Promise.resolve(false); },
         checkForUpdate: function () { checkForUpdate(true); },
         applyUpdate: applyUpdate,
+        forceUpdate: forceUpdate,
         isUpdateAvailable: function () { return !!waitingWorker; }
       };
     }
@@ -90,6 +93,19 @@
   });
 
   pwaApi();
+
+  // Mantém o rodapé com a versão real do app, sem editar cada HTML.
+  function updateVersionLabels() {
+    var labels = document.querySelectorAll('.footer-version');
+    for (var i = 0; i < labels.length; i++) {
+      labels[i].textContent = 'v' + APP_VERSION;
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateVersionLabels);
+  } else {
+    updateVersionLabels();
+  }
 
   if (!canUseServiceWorker()) return;
 
@@ -175,6 +191,41 @@
       updateButton.disabled = false;
       updateButton.textContent = 'Atualizar agora';
     }
+  }
+
+  // Remove service workers e caches (mantém IndexedDB/dados) e recarrega
+  // com uma URL nova. Serve como "botão de emergência" quando o banner de
+  // atualização não aparece.
+  function forceUpdate() {
+    var tasks = [];
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+      tasks.push(
+        navigator.serviceWorker
+          .getRegistrations()
+          .then(function (regs) {
+            return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+          })
+          .catch(function () {})
+      );
+    }
+
+    if (window.caches && caches.keys) {
+      tasks.push(
+        caches
+          .keys()
+          .then(function (keys) {
+            return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+          })
+          .catch(function () {})
+      );
+    }
+
+    return Promise.all(tasks).then(function () {
+      var url = new URL(window.location.href);
+      url.searchParams.set('v', String(Date.now()));
+      window.location.replace(url.toString());
+    });
   }
 
   function applyUpdate() {
