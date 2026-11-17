@@ -7,7 +7,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-// Valores padrão do e-mail (espelham services/configService.js).
+// Valores padrão do e-mail (usados no rascunho do relatório).
 const EMAIL_DEFAULTS = {
   to: 'portaria@clarityglass.com.br',
   cc: 'gerencia@clarityglass.com.br',
@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   UI.initCommon();
   await loadConfig();
   loadEmailConfig();
-  loadSmtpConfig();
 });
 
 async function loadConfig() {
@@ -68,33 +67,6 @@ function restaurarEmailPadrao() {
   UI.showToast('Valores padrão restaurados. Clique em "Salvar Configurações".', 'info');
 }
 
-/* ===== SERVIDOR DE E-MAIL (SMTP) ===== */
-function loadSmtpConfig() {
-  let cfg = {};
-  try {
-    cfg = JSON.parse(localStorage.getItem('claritySmtpConfig') || '{}') || {};
-  } catch (e) {
-    cfg = {};
-  }
-  $('#smtpHost').value = cfg.host || '';
-  $('#smtpPort').value = cfg.port || '';
-  $('#smtpSecure').checked = !!cfg.secure;
-  $('#smtpUser').value = cfg.user || '';
-  $('#smtpPass').value = cfg.pass || '';
-  $('#smtpFrom').value = cfg.from || '';
-}
-
-function collectSmtpConfig() {
-  return {
-    host: $('#smtpHost').value.trim(),
-    port: Number($('#smtpPort').value) || 0,
-    secure: $('#smtpSecure').checked,
-    user: $('#smtpUser').value.trim(),
-    pass: $('#smtpPass').value,
-    from: $('#smtpFrom').value.trim()
-  };
-}
-
 function collectConfig() {
   const tipoInstalacao = document.querySelector('input[name="tipoInstalacao"]:checked')
     ? document.querySelector('input[name="tipoInstalacao"]:checked').value
@@ -126,9 +98,6 @@ async function salvarConfig() {
   try {
     await Portaria.saveConfig(cfg);
     localStorage.setItem('clarityEmailConfig', JSON.stringify(email));
-    const smtp = collectSmtpConfig();
-    if (smtp.host) localStorage.setItem('claritySmtpConfig', JSON.stringify(smtp));
-    else localStorage.removeItem('claritySmtpConfig');
     UI.showToast('Configurações salvas com sucesso!', 'success');
   } catch (e) {
     console.error(e);

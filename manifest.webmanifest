@@ -1,0 +1,64 @@
+{
+  "name": "Portaria Clarity Glass",
+  "short_name": "Portaria CG",
+  "description": "Sistema de Controle da Portaria da Clarity Glass: chaves, visitantes, EPIs, primeiros socorros, avisos, ocorrências, cadastro de pessoas, entrada e saída, autorizações e relatórios.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f0f4f8",
+  "theme_color": "#1a73e8",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Controle de Chaves ou Item",
+      "short_name": "Chaves",
+      "description": "Abrir o controle de chaves e itens",
+      "url": "./controle-de-chaves/index.html",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Controle de Visitantes",
+      "short_name": "Visitantes",
+      "description": "Abrir o controle de visitantes",
+      "url": "./controle-de-visitantes/index.html",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Entrada e Saída",
+      "short_name": "Entrada/Saída",
+      "description": "Registrar entrada e saída de pessoas",
+      "url": "./controle-de-entrada-saida/index.html",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ocorrências",
+      "short_name": "Ocorrências",
+      "description": "Registrar uma ocorrência da portaria",
+      "url": "./controle-de-ocorrencias/index.html",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

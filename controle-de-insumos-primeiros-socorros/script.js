@@ -736,7 +736,7 @@ function deleteOccurrence(id) {
 }
 
 // ===== PDF GENERATION =====
-// Salva o PDF no Electron (pasta da Área de Trabalho) ou via download no navegador.
+  // Salva o PDF na pasta escolhida ou via download no navegador.
 function saveGeneratedPdf(doc, fileName) {
   const FileService = window.PortariaServices ? window.PortariaServices.FileService : null;
   if (FileService && typeof FileService.savePdf === 'function') {

@@ -1,11 +1,13 @@
+# Dependências e artefatos locais
 node_modules/
-electron-x64/
-electron-ia32/
-dist/
-out/
+.vercel/
 
-# Pacotes de build grandes
+# Pacotes de backup
 *.zip
 
-# Pasta de saída (PDFs e backups gerados pelo sistema)
+# Saída gerada pelo sistema (PDFs, backups e relatórios)
 controle-da-portaria/
+
+# Sistema operacional
+Thumbs.db
+.DS_Store

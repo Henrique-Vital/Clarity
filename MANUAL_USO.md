@@ -33,10 +33,10 @@ Este guia explica, passo a passo, como usar cada parte do sistema. Se você est�
 O **Portaria Clarity Glass** é um sistema para controlar tudo o que acontece na portaria: retirada de chaves, entrada e saída de visitantes e funcionários, entrega de EPIs, avisos, ocorrências, autorizações de acesso e muito mais.
 
 **Como abrir o sistema:**
-- **No aplicativo (Electron):** dê dois cliques em `iniciar-app.bat` (ou no atalho do Portaria Clarity Glass).
-- **No navegador:** abra a página `index.html` do sistema (ou a pasta `versao-web/`).
+- **Online:** acesse o endereço publicado do sistema (Vercel) no navegador.
+- **Instalado (PWA):** no Chrome/Edge, use o menu **Instalar aplicativo** para abrir em uma janela própria, como um aplicativo.
 
-> 💡 **Importante:** todos os dados ficam salvos **no próprio computador** (banco IndexedDB do navegador). Não é preciso internet para usar o sistema.
+> 💡 **Importante:** todos os dados ficam salvos **no navegador deste dispositivo** (banco IndexedDB). Depois da primeira abertura, o sistema funciona offline; os dados não são sincronizados entre computadores diferentes.
 
 ---
 
@@ -264,9 +264,9 @@ No fim do seu turno, gere o resumo do dia para repassar à gerência.
    - Um **PDF** (`relatorio_diario_portaria_AAAA-MM-DD.pdf`) com 9 seções: Chaves, EPIs, Insumos, Primeiros Socorros, Visitantes, Avisos, Ocorrências, Entrada e Saída e Autorizações.
    - Um **rascunho de e-mail** já preenchido.
 3. No modal "Relatório e E-mail Preparados" você pode:
-   - **Baixar PDF** — salva o relatório na pasta `controle-da-portaria`.
+   - **Baixar PDF** — baixa o relatório pelo navegador (ou salva na pasta escolhida).
    - **Copiar mensagem** — copia o texto do e-mail.
-   - **Abrir no Outlook** — abre o Outlook com a mensagem e o PDF anexado, prontos para enviar (**nada é enviado sozinho** — você revisa e envia).
+   - **Abrir no e-mail** — abre o aplicativo de e-mail do computador com a mensagem pronta; anexe o PDF baixado manualmente (**nada é enviado sozinho** — você revisa e envia).
    - **Preparar novo relatório** — recomeça.
    - **Fechar**.
 
@@ -281,7 +281,7 @@ Proteja seus dados fazendo backups regulares.
 **Criar um backup (Backup Geral):**
 1. Na tela inicial, clique em **Backup Geral**.
 2. O sistema gera o arquivo `backup_geral_AAAA-MM-DD.json` com **todos os dados** de todos os módulos.
-3. No aplicativo, o arquivo é salvo na pasta `controle-da-portaria`. Na versão web, é baixado normalmente.
+3. O arquivo é baixado pelo navegador (ou salvo na pasta escolhida, quando o navegador permite).
 
 **Restaurar um backup:**
 1. Na tela inicial, clique em **Restaurar Backup**.
@@ -309,10 +309,13 @@ Proteja seus dados fazendo backups regulares.
 ## 17. Perguntas frequentes
 
 **Onde ficam os arquivos (PDFs e backups) que eu gero?**
-No aplicativo, na pasta `controle-da-portaria` (dentro da pasta do sistema). Na versão web, na pasta de Downloads do navegador.
+Na pasta de Downloads do navegador (ou na pasta escolhida, quando o navegador permite salvar diretamente).
 
 **Preciso de internet para usar o sistema?**
-Não. Tudo funciona offline, direto no seu computador.
+Na primeira abertura, sim. Depois disso, o sistema fica disponível offline no mesmo navegador, e os dados são salvos localmente.
+
+**Como atualizar o sistema?**
+Quando houver uma versão nova, aparece o aviso **"Nova versão disponível"** com o botão **"Atualizar agora"**. Clique no botão: a página recarrega já na versão nova, sem precisar reinstalar o aplicativo.
 
 **Os dados são perdidos se eu fechar o programa?**
 Não. Os dados ficam salvos automaticamente no banco do navegador do sistema.

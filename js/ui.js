@@ -462,8 +462,7 @@ const UI = (() => {
       );
 
       // ===== SALVAMENTO =====
-      // No Electron os PDFs vão para a pasta da Área de Trabalho
-      // (via FileService). No navegador, mantém o download padrão.
+      // Usa o FileService (pasta escolhida ou download padrão).
       const blob = doc.output('blob');
       const FileService = window.PortariaServices ? window.PortariaServices.FileService : null;
       if (FileService && typeof FileService.savePdf === 'function') {
@@ -535,8 +534,7 @@ const UI = (() => {
   /* ===== SALVAR ARQUIVO NA PASTA PADRÃO ===== */
   /**
    * Salva um arquivo (Blob) na pasta padrão "controle-da-portaria".
-   * Usa o FileService quando disponível (Electron ou versão web); no
-   * fallback (navegador sem services) faz o download normal.
+   * Usa o FileService quando disponível; no fallback faz o download normal.
    * @param {Blob} blob
    * @param {string} filename
    * @returns {Promise<Object>}

@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1a73e8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Portaria CG">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
   <title>Portaria - Clarity Glass</title>
 
   <!-- Favicon -->
@@ -95,7 +102,7 @@
         <button class="btn btn-secondary hero-cta" id="restaurarBackupBtn" onclick="restaurarBackup()" title="Carregar os dados de um arquivo de backup geral">
           <i class="fas fa-upload"></i> Restaurar Backup
         </button>
-        <button class="btn btn-outline hero-cta" id="fullscreenBtn" onclick="toggleTelaCheia()" title="Alternar tela cheia (modo quiosque no aplicativo)">
+        <button class="btn btn-outline hero-cta" id="fullscreenBtn" onclick="toggleTelaCheia()" title="Alternar tela cheia (modo quiosque)">
           <i class="fas fa-expand"></i> Tela cheia
         </button>
       </div>
@@ -336,11 +343,8 @@
         <button class="btn btn-secondary" id="turnoCopyBtn" title="Copiar a mensagem para a área de transferência">
           <i class="fas fa-copy"></i> Copiar mensagem
         </button>
-        <button class="btn btn-success" id="turnoOutlookBtn" title="Abrir o Outlook com a mensagem e o PDF anexado prontos para enviar">
-          <i class="fas fa-envelope"></i> Abrir no Outlook
-        </button>
-        <button class="btn btn-success" id="turnoEmailBtn" title="Enviar o relatório direto por e-mail (SMTP, sem abrir o Outlook)">
-          <i class="fas fa-paper-plane"></i> Enviar por e-mail
+        <button class="btn btn-success" id="turnoMailBtn" title="Abrir seu aplicativo de e-mail com a mensagem pronta (anexe o PDF baixado manualmente)">
+          <i class="fas fa-envelope"></i> Abrir no e-mail
         </button>
         <button class="btn btn-primary" id="turnoDownloadBtn" title="Baixar o PDF gerado">
           <i class="fas fa-download"></i> Baixar PDF
@@ -358,7 +362,8 @@
   <script src="js/alarme.js"></script>
   <script src="js/backup.js"></script>
   <script src="js/backup-auto.js"></script>
-  <script type="module" src="services/index.js"></script>
+  <script src="js/pwa.js"></script>
+  <script src="js/portaria-services-web.js"></script>
   <script src="js/dashboard.js"></script>
 </body>
 </html>

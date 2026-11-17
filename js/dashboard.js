@@ -13,7 +13,7 @@ let turnoResult = null;
 async function finalizarTurno() {
   const services = window.PortariaServices;
   if (!services) {
-    UI.showToast('Serviços de relatório não carregados. Abra o sistema pelo aplicativo da Portaria.', 'error');
+    UI.showToast('Serviços de relatório não carregados. Recarregue a página e tente novamente.', 'error');
     return;
   }
   setTurnoLoading(true);
@@ -229,13 +229,9 @@ async function baixarPdf() {
       return;
     }
     const res = await FileService.savePdf(turnoResult.pdf.pdfBlob, turnoResult.pdf.pdfName);
-    const destino = (res && res.savedToDesktop)
+    const destino = (res && res.folderName)
       ? `salvo na pasta "${res.folderName}"`
-      : (res && res.folderName)
-          ? `salvo na pasta "${res.folderName}"`
-          : (window.portariaAPI && window.portariaAPI.isElectron
-              ? 'salvo na pasta "controle-da-portaria"'
-              : 'baixado (download iniciado)');
+      : 'baixado (download iniciado)';
     if (res && res.renamed) {
       UI.showToast(`PDF ${destino}. O arquivo anterior estava aberto; salvo como: ${res.fileName}`, 'warning');
     } else {
@@ -252,58 +248,8 @@ function prepararNovoRelatorio() {
   UI.closeModal(DASHBOARD_MODAL_ID);
 }
 
-// ===== ENVIAR POR E-MAIL (SMTP) =====
-async function enviarEmail() {
-  if (!turnoResult) return;
-  if (!window.portariaAPI || !window.portariaAPI.isElectron || !window.portariaAPI.sendEmail) {
-    UI.showToast('O envio direto por e-mail está disponível apenas no aplicativo da Portaria.', 'warning');
-    return;
-  }
-  let smtp = {};
-  try {
-    smtp = JSON.parse(localStorage.getItem('claritySmtpConfig') || '{}') || {};
-  } catch (e) {
-    smtp = {};
-  }
-  if (!smtp.host) {
-    UI.showToast('Configure o servidor de e-mail (SMTP) no módulo Configurações.', 'warning');
-    return;
-  }
-  const { to, cc, subject, body } = turnoResult.draft;
-  UI.showToast('Enviando e-mail...', 'info');
-  try {
-    const res = await window.portariaAPI.sendEmail({
-      smtp,
-      to,
-      cc,
-      subject,
-      body,
-      fileName: turnoResult.pdf.pdfName,
-      base64: turnoResult.pdf.pdfBase64
-    });
-    if (res && res.ok) {
-      UI.showToast('E-mail enviado com sucesso!', 'success');
-    } else {
-      UI.showToast('Erro ao enviar o e-mail: ' + ((res && res.error) || 'erro desconhecido'), 'error');
-    }
-  } catch (err) {
-    UI.showToast('Erro ao enviar o e-mail: ' + (err && err.message ? err.message : 'erro inesperado'), 'error');
-  }
-}
-
 // ===== TELA CHEIA / MODO QUIOSQUE =====
 async function toggleTelaCheia() {
-  // Electron: usa a API nativa da janela (tela cheia).
-  if (window.portariaAPI && window.portariaAPI.isElectron && window.portariaAPI.toggleFullscreen) {
-    try {
-      const res = await window.portariaAPI.toggleFullscreen();
-      UI.showToast(res && res.fullscreen ? 'Tela cheia ativada.' : 'Tela cheia desativada.', 'info');
-      return;
-    } catch (e) {
-      // cai para a Fullscreen API do navegador
-    }
-  }
-  // Navegador: Fullscreen API.
   try {
     if (!document.fullscreenElement) {
       await document.documentElement.requestFullscreen();
@@ -320,7 +266,7 @@ async function toggleTelaCheia() {
 async function gerarRelatorioPeriodo() {
   const services = window.PortariaServices;
   if (!services || !services.ReportService || !services.ReportService.preparePeriodReport) {
-    UI.showToast('Serviços de relatório não carregados. Abra o sistema pelo aplicativo da Portaria.', 'error');
+    UI.showToast('Serviços de relatório não carregados. Recarregue a página e tente novamente.', 'error');
     return;
   }
   UI.openReportModal(async (start, end, sections, filters) => {
@@ -341,7 +287,7 @@ async function gerarRelatorioPeriodo() {
 async function exportarExcelGeral() {
   const services = window.PortariaServices;
   if (!services || !services.ReportService || !services.ReportService.preparePeriodExcel) {
-    UI.showToast('Serviços de relatório não carregados. Abra o sistema pelo aplicativo da Portaria.', 'error');
+    UI.showToast('Serviços de relatório não carregados. Recarregue a página e tente novamente.', 'error');
     return;
   }
   UI.openReportModal(async (start, end, sections, filters) => {
@@ -364,13 +310,9 @@ async function salvarArquivoGeral(blob, fileName, tipo) {
   }
   try {
     const res = await FileService.savePdf(blob, fileName);
-    const destino = (res && res.savedToDesktop)
+    const destino = (res && res.folderName)
       ? `salvo na pasta "${res.folderName}"`
-      : (res && res.folderName)
-          ? `salvo na pasta "${res.folderName}"`
-          : (window.portariaAPI && window.portariaAPI.isElectron
-              ? 'salvo na pasta "controle-da-portaria"'
-              : 'baixado (download iniciado)');
+      : 'baixado (download iniciado)';
     UI.showToast(`${tipo} ${destino}: ${fileName}`, 'success');
   } catch (e) {
     console.error('Erro ao salvar arquivo:', e);
@@ -378,26 +320,17 @@ async function salvarArquivoGeral(blob, fileName, tipo) {
   }
 }
 
-async function abrirOutlook() {
+function abrirEmail() {
   if (!turnoResult) return;
-  if (!window.portariaAPI || !window.portariaAPI.isElectron) {
-    UI.showToast('Esta função está disponível apenas no aplicativo da Portaria.', 'warning');
-    return;
-  }
-  try {
-    const { to, cc, subject, body } = turnoResult.draft;
-    await window.portariaAPI.sendOutlook({
-      to,
-      cc,
-      subject,
-      body,
-      fileName: turnoResult.pdf.pdfName,
-      base64: turnoResult.pdf.pdfBase64
-    });
-    UI.showToast('Outlook aberto com mensagem e anexo prontos.', 'success');
-  } catch (err) {
-    UI.showToast(`Erro ao abrir o Outlook: ${err.message}`, 'error');
-  }
+  const { to, cc, subject, body } = turnoResult.draft;
+  const params = [];
+  if (cc && cc.length) params.push('cc=' + encodeURIComponent(cc.join(',')));
+  if (subject) params.push('subject=' + encodeURIComponent(subject));
+  if (body) params.push('body=' + encodeURIComponent(body));
+  const destinatarios = (to || []).join(',');
+  const mailto = 'mailto:' + destinatarios + (params.length ? '?' + params.join('&') : '');
+  UI.showToast('Abrindo o aplicativo de e-mail. Anexe o PDF baixado manualmente.', 'info');
+  window.location.href = mailto;
 }
 
 // ===== PRIMEIROS SOCORROS (IndexedDB com fallback no localStorage) =====
@@ -550,9 +483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('turnoCopyBtn').addEventListener('click', copiarMensagem);
   document.getElementById('turnoDownloadBtn').addEventListener('click', baixarPdf);
-  document.getElementById('turnoOutlookBtn').addEventListener('click', abrirOutlook);
-  const turnoEmailBtn = document.getElementById('turnoEmailBtn');
-  if (turnoEmailBtn) turnoEmailBtn.addEventListener('click', enviarEmail);
+  document.getElementById('turnoMailBtn').addEventListener('click', abrirEmail);
   document.getElementById('turnoNewBtn').addEventListener('click', prepararNovoRelatorio);
 
   try {

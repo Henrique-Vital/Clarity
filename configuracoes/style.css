@@ -101,22 +101,6 @@
   color: var(--success);
 }
 
-/* ===== INLINE CHECK (SMTP) ===== */
-.cfg-inline-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.9rem;
-  color: var(--text);
-  cursor: pointer;
-}
-.cfg-inline-check input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
 /* ===== FORM ACTIONS ===== */
 .form-actions {
   display: flex;
